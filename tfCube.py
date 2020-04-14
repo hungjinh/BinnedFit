@@ -9,7 +9,6 @@ from scipy.ndimage.interpolation import rotate
 from astropy.cosmology import Planck13 as planck
 import pdb, traceback
 
-
 data_path = "/Users/hhg/Research/kinematic_lensing/repo/KLens"
 
 # try to keep wavelength in nm all along
@@ -137,24 +136,24 @@ def getGalaxySpectrum(params, file = data_path+'/data/Simulation/GSB3.spec',norm
     spec = np.zeros(lambdaGrid.size, dtype = [('lambda',np.float),('flux',np.float)])
     specInterp = interp1d(data['lambda']*(1+params['redshift']), data['flux'])
     spec['lambda'] = lambdaGrid
-    
+
     if params['add_continuum']==1:
-        # if add_continuum is set 1, then fill spec['flux'] with continuum values; 
+        # if add_continuum is set 1, then fill spec['flux'] with continuum values;
         # keep spec['flux'][:]=0. otherwise and sent it to addGalaxyEmission
-        
+
         spec['flux'] = specInterp(lambdaGrid)
-        
+
         # smooth the template to our instrumental resolution.
         for i,item in enumerate(spec):
             sigmasq =  (item['lambda']/ params['Resolution'])**2
             kernel = np.exp(-(spec['lambda'] - item['lambda'])**2/2./sigmasq)/np.sqrt( 2*np.pi * sigmasq )
             kernel = kernel/np.sum(kernel)
             spec[i]['flux'] = np.sum(kernel*spec['flux'])
-        
+
         data_norm = specInterp(lambda_norm)
         renorm = norm*1./data_norm
         spec['flux'] = spec['flux']*renorm
-        
+
     spec = addGalaxyEmission(spec,params)
     return spec
 
@@ -177,7 +176,7 @@ def getGalaxySlice(pars):
     return newImage,disk,psf
 
 
-def getGalaxyImage(pars, signal_to_noise = None):
+def getGalaxyImage(pars, signal_to_noise=None):
     psf = galsim.Gaussian(fwhm = pars['psfFWHM'])
     qzsq = pars['aspect']**2
     qsq = (1 - (1-qzsq)*pars['sini'])
@@ -199,11 +198,12 @@ def getGalaxyImage(pars, signal_to_noise = None):
         newImage.addNoiseSNR(galsim.GaussianNoise(),signal_to_noise)
     return newImage,psf
 
-def getPhi(theta,pars= None):
+def getPhi(theta, pars=None):
     # This is re-assigning angles in the image plane according to the true inclination of the disk.
     #phi = np.arctan(np.tan(theta)/np.sqrt(1 - pars['sini']**2))
     #phi = np.arctan2(np.sin(theta)*pars['sini'],np.cos(theta))
-    phi = np.arctan(np.tan(theta)*pars['sini'])
+    #phi = np.arctan(np.tan(theta)*pars['sini'])
+    phi = np.arctan(np.tan(theta)*np.sqrt(1 - pars['sini']**2))
     # But we need to go through and re-sign.
 
     x_orig = np.cos(theta)
@@ -216,7 +216,7 @@ def getPhi(theta,pars= None):
     return phi_final
 
 
-def getTFcube(pars,aperture, offset, space = False):
+def getTFcube(pars, aperture, offset, space = False):
     # get the spectra
     pars_more = pars.copy()
     pars_more['lambda_min'] = pars['lambda_min']*0.8
@@ -227,9 +227,9 @@ def getTFcube(pars,aperture, offset, space = False):
     if space == False:
         specPh = transmit(specPh)
 
-    obsLambda = np.arange(pars['lambda_min'],pars['lambda_max'],pars['nm_per_pixel'])
-    specInterp = interp1d(specPh['lambda'],specPh['photonRate'],kind='slinear')
-    obsSpecPh = np.empty(specPh.size,dtype=[('lambda',np.float),('photonRate',np.float)])
+    obsLambda = np.arange(pars['lambda_min'], pars['lambda_max'], pars['nm_per_pixel'])
+    specInterp = interp1d(specPh['lambda'], specPh['photonRate'], kind='slinear')
+    obsSpecPh = np.empty(specPh.size, dtype=[('lambda',np.float), ('photonRate',np.float)])
     obsSpecPh['lambda'] = specPh['lambda']
     obsSpecPh['photonRate'] = ( specInterp(specPh['lambda'])*
                                 pars['expTime']*pars['area']*
@@ -268,6 +268,7 @@ def getTFcube(pars,aperture, offset, space = False):
         for j,y in enumerate(grid1d):
             # This line here is where the disk velocity field enters.
             thisLambda = 1./(1 +   v[i,j] *pars['sini']*np.cos(phi[i,j])) * obsLambda
+            #thisLambda = (1 + pars['redshift'] + v[i,j] *pars['sini']*np.cos(phi[i,j]))/(1+pars['redshift']) * obsLambda
             thisSpec = obsInterp(thisLambda)*galIm.array[i,j] # this is the unsheared thing.
             fluxGrid[i,j,:] = thisSpec # currently in units of photon flux
     # Shear the results and project them onto the output grid.
@@ -279,7 +280,6 @@ def getTFcube(pars,aperture, offset, space = False):
     #psf = psf.dilate(1.02)
     psfInv = galsim.Deconvolve(psf)
     for i in range(lambda_1d.size):
-
 
         thisIm = galsim.Image(np.ascontiguousarray(fluxGrid[:,:,i]),
                               scale = subGridPixScale)
@@ -303,7 +303,7 @@ def getTFcube(pars,aperture, offset, space = False):
 
     print( "returning:")
     print( "lambda, observation, model, sky (the last three are (npix, npix, nspax) datacubes)")
-    return obsLambda, obsGrid, idealGrid, skyGrid
+    return obsLambda, obsGrid, idealGrid, skyGrid, fluxGrid
 
 def getSlitSpectra(data=None, pars=None):
     spectra = []
