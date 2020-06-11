@@ -14,7 +14,7 @@ data_path = "/Users/hhg/Research/kinematic_lensing/repo/KLens"
 # try to keep wavelength in nm all along
 
 def getParams(sini = 0.3, diskFrac = 1.0,
-              aspect = 0.19, vcirc = 220,
+              aspect = 0.2, vcirc = 220,
               linelist = None,
               norm = 1e-26, # Amplitude of galaxy continuum.
               abs_magnitude = None,
@@ -160,8 +160,10 @@ def getGalaxySpectrum(params, file = data_path+'/data/Simulation/GSB3.spec',norm
 def getGalaxySlice(pars):
     psf = galsim.Gaussian(fwhm = pars['psfFWHM'])
     qzsq = pars['aspect']**2
-    qsq = (1 - (1-qzsq)*pars['sini'])
-    g1_int = (1-qsq)/(1+qsq)
+    qsq = (1 - (1-qzsq)*pars['sini']**2)
+    distortion = (1-qsq)/(1+qsq)
+    g1_int = distortion/2.
+
     extent =  pars['image_size'] * pars['pixScale']
     subGridPixScale = extent*1./pars['ngrid']
     disk = galsim.Sersic(n=1,half_light_radius = pars['half_light_radius'],flux= ( 1 - pars['knot_fraction']) )
@@ -173,15 +175,15 @@ def getGalaxySlice(pars):
     galObj = galsim.Convolution([finalgal,psf])
     image = galsim.Image(pars['ngrid'],pars['ngrid'],scale=subGridPixScale)
     newImage = galObj.drawImage(image=image)
-    return newImage,disk,psf
+    return newImage, disk, psf
 
 
 def getGalaxyImage(pars, signal_to_noise=None):
     psf = galsim.Gaussian(fwhm = pars['psfFWHM'])
     qzsq = pars['aspect']**2
-    qsq = (1 - (1-qzsq)*pars['sini'])
-    g1_int = (1-qsq)/(1+qsq)
-
+    qsq = (1 - (1-qzsq)*pars['sini']**2)
+    distortion = (1-qsq)/(1+qsq)
+    g1_int = distortion/2.
 
     disk = galsim.Sersic(n=1,half_light_radius = pars['half_light_radius'],flux= ( 1 - pars['knot_fraction']) )
     disk = disk.shear(g1=g1_int,g2=0.0)
@@ -195,15 +197,15 @@ def getGalaxyImage(pars, signal_to_noise=None):
     image = galsim.Image(pars['image_size'],pars['image_size'],scale= pars['pixScale'])
     newImage = galObj.drawImage(image=image)
     if signal_to_noise is not None:
-        newImage.addNoiseSNR(galsim.GaussianNoise(),signal_to_noise)
-    return newImage,psf
+        variance = newImage.addNoiseSNR(galsim.GaussianNoise(), signal_to_noise, preserve_flux=True)
+    return newImage.array, variance
 
 def getPhi(theta, pars=None):
     # This is re-assigning angles in the image plane according to the true inclination of the disk.
-    #phi = np.arctan(np.tan(theta)/np.sqrt(1 - pars['sini']**2))
+    phi = np.arctan(np.tan(theta)/np.sqrt(1 - pars['sini']**2))
     #phi = np.arctan2(np.sin(theta)*pars['sini'],np.cos(theta))
     #phi = np.arctan(np.tan(theta)*pars['sini'])
-    phi = np.arctan(np.tan(theta)*np.sqrt(1 - pars['sini']**2))
+    #phi = np.arctan(np.tan(theta)*np.sqrt(1 - pars['sini']**2))
     # But we need to go through and re-sign.
 
     x_orig = np.cos(theta)
@@ -259,7 +261,7 @@ def getTFcube(pars, aperture, offset, space = False):
     r = np.sqrt(xx**2 + yy**2)
     theta = np.angle(xx+1j*yy)
     # Generate the galaxy image that goes with this.
-    galIm,galObj,psf = getGalaxySlice(pars)
+    galIm, galObj, psf = getGalaxySlice(pars)
     lambda_1d = np.arange(pars['lambda_min'],pars['lambda_max'],pars['nm_per_pixel'])
     fluxGrid = np.empty([pars['ngrid'],pars['ngrid'],obsLambda.size])
     phi = getPhi(theta,pars=pars)

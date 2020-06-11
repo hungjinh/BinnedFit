@@ -68,3 +68,5 @@ class GaussFit_spec2D():
             model_spec2D[j] = gaussian(self.grid_lambda, fitted_peakLambda[j], fitted_amp[j], fitted_sigma[j])
 
         return model_spec2D
+    
+

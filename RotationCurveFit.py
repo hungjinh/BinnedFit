@@ -8,98 +8,12 @@ from binnedFit_utilities import *
 from GaussFit_spec2D import GaussFit_spec2D
 
 
-class Parameter():
-    def __init__(self, par_tfCube, par_fix=None):
-        self.par_fid = self.gen_par_fiducial(par_tfCube)
-        self.par_fix = par_fix
-        self.par_set = self.par_set(par_fix=self.par_fix)
-
-        self.all_par_key = ['r_t', 'r_0', 'v_a', 'v_0', 'redshift', 'sini']
-        self.par_absID = {item:j for j, item in enumerate(self.all_par_key)}
-
-        self.par_std = self.def_par_std()
-        self.par_lim = self.def_par_lim()
-        self.par_name = self.def_par_name()
-
-    def gen_par_fiducial(self, par_tfCube):
-        par_fid = {}
-        par_fid['sini'] = par_tfCube['sini']
-        par_fid['redshift'] = par_tfCube['redshift']
-        par_fid['r_0'] = 0.0
-        par_fid['r_t'] = par_tfCube['vscale']
-        par_fid['v_0'] = 0.0
-        par_fid['v_a'] = par_tfCube['vcirc']
-        return par_fid
-
-    def def_par_lim(self):
-        par_lim = {}
-        par_lim['sini'] = [0., 1.]
-        par_lim['redshift'] = [self.par_fid['redshift']-0.0035, self.par_fid['redshift']+0.0035]
-        par_lim['r_0'] = [-2., 2.]
-        par_lim['r_t'] = [0., 1.]
-        par_lim['v_0'] = [-1000., 1000.]
-        par_lim['v_a'] = [-1000., 1000.]
-        return par_lim
-    
-    def def_par_std(self):
-        '''
-            define the initial std of emcee walkers around starting point 
-        '''
-        par_std = {}
-        par_std['sini'] = 0.1
-        par_std['redshift'] = 0.001
-        par_std['r_0'] = 0.1
-        par_std['r_t'] = 0.1
-        par_std['v_0'] = 20.
-        par_std['v_a'] = 20.
-        return par_std
-    
-    def def_par_name(self):
-        par_name = {}
-        par_name['sini'] = "${\mathrm sin}(i)$"
-        par_name['redshift'] = "$z_{\mathrm c}$"
-        par_name['r_0'] = "$r_0$"
-        par_name['r_t'] = "$r_{\mathrm t}$"
-        par_name['v_0'] = "$v_0$"
-        par_name['v_a'] = "$v_{\mathrm circ}$"
-        return par_name
-
-    def par_set(self, par_fix=None):
-
-        par_set = self.par_fid.copy()
-        
-        if par_fix is not None:
-            for item in list(par_fix.keys()):
-                par_set[item] = par_fix[item]
-
-        return par_set
-
-    
-    def gen_par_dict(self, active_par, active_par_key):
-        par = self.par_set.copy()
-
-        for j,item in enumerate(active_par_key):
-            par[item] = active_par[j]
-            #par[item] = np.atleast_2d(active_par[:,j])  ####SSS ... use reshape
-            # print(par[item].shape)
-        return par
-
-    def append_par(self, par_partial):
-
-        par = self.par_set.copy()
-
-        for item in list(par_partial.keys()):
-            par[item] = par_partial[item] 
-        
-        return par
-
-
 class RotationCurveFit(GaussFit_spec2D):
 
-    def __init__(self, data_info, active_par_key=['r_t', 'r_0', 'v_a', 'v_0', 'redshift'], par_fix=None):
+    def __init__(self, data_info, e_obs=None, active_par_key=['vscale', 'r_0', 'vcirc', 'v_0'], par_fix=None):
         '''
             e.g. 
-            active_par_key = ['r_t', 'r_0', 'v_a', 'v_0']
+            active_par_key = ['vscale', 'r_0', 'vcirc', 'v_0']
             par_fix = {'redshift': 0.598}
         '''
 
@@ -112,12 +26,18 @@ class RotationCurveFit(GaussFit_spec2D):
 
         self.gaussfit_peakLambda, self.gaussfit_amp, self.gaussfit_sigma = self.gaussFit_spec2D(data=self.data)
 
+        if e_obs is not None:
+            self.shear_mode = 1
+            self.e_obs = e_obs
+        else:
+            self.shear_mode = 0
 
-    def model_arctan_rotation(self, r, r_t, r_0, v_a, v_0, redshift, sini):
+
+    def model_arctan_rotation(self, r, vscale, r_0, vcirc, v_0, redshift, sini):
         '''
             arctan rotation curve in unit of lambda_obs, given cosmological redshift
         '''
-        peak_Vp = arctan_rotation_curve(r, r_t, r_0, v_a, v_0, sini)
+        peak_Vp = arctan_rotation_curve(r, vscale, r_0, vcirc, v_0, sini)
         model_lambda = velocity_to_lambda(v_peculiar=peak_Vp, lambda_emit=self.lambda_emit, redshift=redshift)
 
         return model_lambda
@@ -127,7 +47,7 @@ class RotationCurveFit(GaussFit_spec2D):
         '''
             fit an arctan velocity curve based on the best-fit lambda peak (as a function of position grid),
             to get an estimation on the velocity profile parameters
-            par_init_guess : {'r_t': 3., 'v_a':200.}
+            par_init_guess : {'vscale': 3., 'vcirc':200.}
         '''
 
         if par_init_guess is not None:
@@ -160,7 +80,7 @@ class RotationCurveFit(GaussFit_spec2D):
         par = self.Parameter.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key)
         #print(par)
 
-        model = self.model_arctan_rotation(self.grid_pos, r_t=par['r_t'], r_0=par['r_0'], v_a=par['v_a'], v_0=par['v_0'], redshift=par['redshift'], sini=par['sini'])
+        model = self.model_arctan_rotation(self.grid_pos, vscale=par['vscale'], r_0=par['r_0'], vcirc=par['vcirc'], v_0=par['v_0'], redshift=par['redshift'], sini=par['sini'])
         #print(model_1D_lambdaPeak)
 
         #diff = self.gaussfit_peakLambda.reshape(256,1) - model
@@ -177,31 +97,58 @@ class RotationCurveFit(GaussFit_spec2D):
 
         for item in self.active_par_key:
             if ( par[item] < self.Parameter.par_lim[item][0] or par[item] > self.Parameter.par_lim[item][1] ):
-                return -np.inf
-
-        #########SS
+                return -np.inf, -99., -99.
+        ######### vectorized #########
         #for j, item in enumerate(self.active_par_key):
         #    # print(par[item].shape)
         #    x= np.logical_or(par[item][0] < self.Parameter.par_lim[item][0], par[item][0] > self.Parameter.par_lim[item][1])
         #    loglike[x]=-np.inf
-        #########SS
+        ######### vectorized #########
 
         chi2 = self.cal_chi2(active_par)
 
-        loglike = -0.5*chi2
+        ### informative prior ###
+        if 'vcirc' in self.active_par_key:
+            logPrior_vcirc = self.logPrior_vcirc(vcirc=par['vcirc'])
+        else: 
+            logPrior_vcirc = 0
+        ### informative prior ###
 
-        return loglike
+        loglike = -0.5*chi2 + logPrior_vcirc
+
+        e_int = self.cal_e_int(sini=par['sini'], aspect=self.Parameter.par_fid['aspect'])
+        g1 = self.cal_gamma1(e_int=e_int, e_obs=self.e_obs)
+
+        return loglike, e_int, g1
+    
+    def logPrior_vcirc(self, vcirc):
+        '''
+            add logPrior on intrinsic circular velocity of disk based on TF relation
+        '''
+        sigma_int = 0.1
+        M_B = -21.8
+        log10_vTFR_mean = np.log10(self.Parameter.par_fid['vcirc']) # 2.142-0.128*(M_B + 20.558)
+        logPrior_vcirc = -0.5 * ((np.log10(vcirc) - log10_vTFR_mean)/sigma_int)**2
+
+        return logPrior_vcirc
+    
+    def cal_e_int(self, sini, aspect):
+        return ( (1-aspect**2)*sini**2 ) / ( 2-(1-aspect**2)*sini**2 )
+    
+    def cal_gamma1(self, e_int, e_obs):
+        return (e_obs-e_int)/2/(1-e_int**2)
 
     def run_MCMC(self, Nwalker, Nsteps):
 
         Ndim = self.Ntot_active_par
         starting_point = [ self.Parameter.par_fid[item] for item in self.active_par_key ]
         std = [ self.Parameter.par_std[item] for item in self.active_par_key ]
+        blobs_dtype = [("e_int", float), ("g1", float)]
         p0_walkers = emcee.utils.sample_ball(starting_point, std, size=Nwalker)
 
-            
-        sampler = emcee.EnsembleSampler(Nwalker, Ndim, self.cal_loglike, a=2.0)
-                    # emcee a parameter: Npar < 4 -> better set a > 3  ( a = 5.0 )
+        sampler = emcee.EnsembleSampler(
+            Nwalker, Ndim, self.cal_loglike, a=2.0, blobs_dtype=blobs_dtype)
+        # emcee a parameter: Npar < 4 -> better set a > 3  ( a = 5.0 )
                     #                  : Npar > 7 -> better set a < 2  ( a = 1.5 ) 
         posInfo = sampler.run_mcmc(p0_walkers,5)
         p0_walkers = posInfo.coords
@@ -212,11 +159,14 @@ class RotationCurveFit(GaussFit_spec2D):
         Time_MCMC=(time.time()-Tstart)/60.
         print ("Total MCMC time (mins):",Time_MCMC)
 
+        chain_e_int = np.array(sampler.get_blobs()['e_int']).T
+        chain_gamma = np.array(sampler.get_blobs()['g1']).T
+
         chain_info = {}
         chain_info['acceptance_fraction'] = np.mean(sampler.acceptance_fraction) # good range: 0.2~0.5
         chain_info['lnprobability'] = sampler.lnprobability
-        chain_info['chain'] = sampler.chain
-        chain_info['par_key'] = self.active_par_key
+        chain_info['chain'] = np.dstack( (np.dstack((sampler.chain, chain_e_int)), chain_gamma))
+        chain_info['par_key'] = self.active_par_key + ['e_int', 'g1']
         chain_info['par_fid'] = self.Parameter.par_fid
         chain_info['par_name'] = self.Parameter.par_name
 
