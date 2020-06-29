@@ -16,7 +16,7 @@ data_path = "/Users/hhg/Research/kinematic_lensing/repo/KLens"
 def getParams(sini = 0.3, diskFrac = 1.0,
               aspect = 0.2, vcirc = 220,
               linelist = None,
-              norm = 1e-26, # Amplitude of galaxy continuum.
+              norm=6e-24,  # Amplitude of galaxy continuum.
               abs_magnitude = None,
               redshift = 0.5,
               type_of_observation = 'fiber',
@@ -166,7 +166,8 @@ def getGalaxySlice(pars):
 
     extent =  pars['image_size'] * pars['pixScale']
     subGridPixScale = extent*1./pars['ngrid']
-    disk = galsim.Sersic(n=1,half_light_radius = pars['half_light_radius'],flux= ( 1 - pars['knot_fraction']) )
+    disk = galsim.Sersic(n=1, half_light_radius=pars['half_light_radius'], flux=(
+        1 - pars['knot_fraction']), trunc=4*pars['half_light_radius'])
     disk = disk.shear(g1=g1_int,g2=0.0)
     disk = disk.shear(g1=pars['g1'],g2=pars['g2'])
     psf = psf.shear(g1=pars['psf_g1'],g2=pars['psf_g2'])
@@ -202,21 +203,15 @@ def getGalaxyImage(pars, signal_to_noise=None):
 
 def getPhi(theta, pars=None):
     # This is re-assigning angles in the image plane according to the true inclination of the disk.
-    phi = np.arctan(np.tan(theta)/np.sqrt(1 - pars['sini']**2))
-    #phi = np.arctan2(np.sin(theta)*pars['sini'],np.cos(theta))
-    #phi = np.arctan(np.tan(theta)*pars['sini'])
-    #phi = np.arctan(np.tan(theta)*np.sqrt(1 - pars['sini']**2))
-    # But we need to go through and re-sign.
-
-    x_orig = np.cos(theta)
-    y_orig = np.sin(theta)
-    # the arctan function always returns a coordinate in the +x half of the plane.
-    x_new = np.cos(phi)
-    y_new = np.sin(phi)
-    x_new[x_orig < 0] = -x_new[x_orig < 0]
-    phi_final = np.angle(x_new+1j*y_new)
-    return phi_final
-
+    if pars['sini'] == 1:
+        phi = np.zeros((pars['ngrid'], pars['ngrid']))
+        half_ngrid = int(pars['ngrid']/2)
+        phi[:, :half_ngrid] = np.pi
+        return phi
+    else:
+        cosi = np.sqrt(1 - pars['sini']**2)
+        phi = np.arctan2(np.sin(theta)/cosi, np.cos(theta))
+        return phi
 
 def getTFcube(pars, aperture, offset, space = False):
     # get the spectra
@@ -270,6 +265,8 @@ def getTFcube(pars, aperture, offset, space = False):
         for j,y in enumerate(grid1d):
             # This line here is where the disk velocity field enters.
             thisLambda = 1./(1 +   v[i,j] *pars['sini']*np.cos(phi[i,j])) * obsLambda
+            #thisLambda = (1 +   v[i,j] *pars['sini']*np.cos(phi[i,j])) * obsLambda
+            #thisLambda = (1 + v[i, j] * pars['sini'] * np.cos(phi[i, j])) * obsLambda
             #thisLambda = (1 + pars['redshift'] + v[i,j] *pars['sini']*np.cos(phi[i,j]))/(1+pars['redshift']) * obsLambda
             thisSpec = obsInterp(thisLambda)*galIm.array[i,j] # this is the unsheared thing.
             fluxGrid[i,j,:] = thisSpec # currently in units of photon flux

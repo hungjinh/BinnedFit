@@ -33,9 +33,21 @@ class ChainTool():
         self.lnprob = chain_info['lnprobability'][:, exNburn:exNend].reshape((-1))
 
         self.chain_par_key = chain_info['par_key']
-        self.chain_par_id = {item:j for j, item in enumerate(self.chain_par_key)}
         self.par_fid = chain_info['par_fid']
         self.par_name = chain_info['par_name']
+
+        if ('sini' in self.chain_par_key and 'vcirc' in self.chain_par_key):
+            self.append_vsini()
+            self.chain_par_key = self.chain_par_key + ['vsini']
+        
+        self.chain_par_id = {item:j for j, item in enumerate(self.chain_par_key)}
+
+    
+    def append_vsini(self):
+        vsini = self.chain[:, self.chain_par_key.index('sini')] * \
+            self.chain[:, self.chain_par_key.index('vcirc')]
+        self.chain = np.append(self.chain, vsini[..., None], 1)
+
 
     def select_par_info(self, select_par_key):
 

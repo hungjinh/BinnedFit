@@ -1,11 +1,31 @@
+import pickle
+import galsim
+from scipy.ndimage.interpolation import rotate
 import numpy as np
 import sys
 sys.path.append("/Users/hhg/Research/kinematic_lensing/code/BinnedFit/")
 import time
-import tfCube
-import galsim
+sys.path.append("/Users/hhg/Research/kinematic_lensing/repo/KLens/")
+import tfCube as tfCube
 
-c = 299792.458 # km/s
+c = 299792.458  # km/s
+
+def load_pickle(filename):
+    ### to read
+    FileObject = open(filename, 'rb')
+    if sys.version_info[0] < 3:
+        info = pickle.load(FileObject)
+    else:
+        info = pickle.load(FileObject, encoding='latin1')
+    FileObject.close()
+    return info
+
+
+def save_pickle(filename, info):
+    FileObject = open(filename, 'wb')
+    pickle.dump(info, FileObject)
+    FileObject.close()
+
 
 def lambda_hubble(lambda_emit, redshift):
     '''
@@ -95,7 +115,7 @@ def gen_dataInfo_from_tfCube(sini=1.0,
     #nfiber = 5
     #r_off = 1.5
     pars['fiber_size'] = 1.0
-    pars['psfFWHM'] = 0.1
+    pars['psfFWHM'] = 0.5
     pars['vscale'] = pars['half_light_radius']
     pars['ngrid'] = 256
     pars['image_size'] = 128
@@ -103,7 +123,7 @@ def gen_dataInfo_from_tfCube(sini=1.0,
     extent =  pars['image_size'] * pars['pixScale']
     subGridPixScale = extent*1./pars['ngrid']
     # turned off continuum
-    pars['add_continuum'] = 0
+    pars['add_continuum'] = False
 
     # ========================
     print_key_list=['redshift', 'g1', 'half_light_radius', 'vcirc', 'sini', 'slitWidth', 'slitAngles']
@@ -115,14 +135,13 @@ def gen_dataInfo_from_tfCube(sini=1.0,
 
     starting_time = time.time()
     aperture = galsim.Image(pars['ngrid'], pars['ngrid'], scale=subGridPixScale)
-    obsLambda, obsGrid, modelGrid, skyGrid, fluxGrid = tfCube.getTFcube(pars, aperture, [0., 0.])
-    image_data, image_variance = tfCube.getGalaxyImage(
-        pars, signal_to_noise=100)
+    obsLambda, obsGrid, modelGrid, skyGrid = tfCube.getTFcube(pars, aperture, [0., 0.])
+    image_data, image_variance = tfCube.getGalaxyImage(pars, signal_to_noise=100)
 
     print("total tfCube time:", time.time()-starting_time, "(sec)")
 
     starting_time = time.time()
-    data0 = tfCube.getSlitSpectra(data=modelGrid, pars=pars)
+    data0 = getSlitSpectra(data=modelGrid, pars=pars)
     #data0 = tfCube.getSlitSpectra(data=fluxGrid,pars=pars)
     print("total getSlitSpectra time:", time.time()-starting_time, "(sec)")
 
@@ -130,7 +149,7 @@ def gen_dataInfo_from_tfCube(sini=1.0,
 
     data_info['ModelCube'] = modelGrid
     data_info['ObsCube'] = obsGrid
-    data_info['image'] = image_data
+    data_info['image'] = image_data.array
     data_info['image_variance'] = image_variance
 
     if len(pars['slitAngles']) == 1:
@@ -147,6 +166,19 @@ def gen_dataInfo_from_tfCube(sini=1.0,
 
     return data_info
 
+def getSlitSpectra(data=None, pars=None):
+    spectra = []
+    extent = pars['image_size'] * pars['pixScale']
+    subGridPixScale = extent*1./pars['ngrid']
+    grid = np.arange(-extent/2., extent/2., subGridPixScale)
+    xx, yy = np.meshgrid(grid, grid)
+    slit_weight = np.ones((pars['ngrid'], pars['ngrid']))
+    slit_weight[np.abs(yy-pars['slitOffset']) > pars['slitWidth']/2.] = 0.
+
+    for this_slit_angle in pars['slitAngles']:
+        this_data = rotate(data, -this_slit_angle*(180./np.pi), reshape=False)
+        spectra.append(np.sum(this_data*slit_weight[:, :, np.newaxis], axis=0))
+    return spectra
 
 class Parameter():
     def __init__(self, par_tfCube=None, par_fix=None):
@@ -179,14 +211,15 @@ class Parameter():
                             ** 2) / (2-(1-par_tfCube['aspect']**2)*par_tfCube['sini']**2)
         par_fid['g1'] = par_tfCube['g1']
         par_fid['g2'] = par_tfCube['g2']
+        par_fid['vsini'] = par_fid['vcirc']*par_fid['sini']
         return par_fid
 
     def def_par_lim(self):
         par_lim = {}
-        par_lim['sini'] = [0., 1.]
+        par_lim['sini'] = [-1., 1.]
         par_lim['redshift'] = [self.par_fid['redshift']-0.0035, self.par_fid['redshift']+0.0035]
         par_lim['r_0'] = [-2., 2.]
-        par_lim['vscale'] = [0., 1.]
+        par_lim['vscale'] = [0., 10.]
         par_lim['v_0'] = [-1000., 1000.]
         par_lim['vcirc'] = [0., 1000.]
 
@@ -220,6 +253,7 @@ class Parameter():
         par_name['e_int'] = "$e_{\mathrm{int}}$"
         par_name['g1'] = "$\gamma_{\mathrm{1}}$"
         par_name['g2'] = "$\gamma_{\mathrm{2}}$"
+        par_name['vsini'] = "$v_{\mathrm{circ}}{\mathrm{sin}}(i)$"
         return par_name
 
     def par_set(self, par_fix=None):

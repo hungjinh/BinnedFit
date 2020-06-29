@@ -1,7 +1,3 @@
-import sys
-sys.path.append("../scrips/")
-sys.path.append("../repo/KLens/")
-
 import numpy as np
 from scipy.optimize import curve_fit
 import time

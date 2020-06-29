@@ -125,10 +125,15 @@ class RotationCurveFit(GaussFit_spec2D):
         '''
             add logPrior on intrinsic circular velocity of disk based on TF relation
         '''
-        sigma_int = 0.1
-        M_B = -21.8
-        log10_vTFR_mean = np.log10(self.Parameter.par_fid['vcirc']) # 2.142-0.128*(M_B + 20.558)
-        logPrior_vcirc = -0.5 * ((np.log10(vcirc) - log10_vTFR_mean)/sigma_int)**2
+        #sigma_int = 0.1
+        #M_B = -21.8
+        #log10_vTFR_mean = np.log10(np.abs(self.Parameter.par_fid['vcirc'])) # 2.142-0.128*(M_B + 20.558)
+        #logPrior_vcirc = -0.5 * ((np.log10(np.abs(vcirc)) - log10_vTFR_mean)/sigma_int)**2
+
+        sigma_int = 20.
+        vTFR_mean = np.abs(self.Parameter.par_fid['vcirc'])
+        logPrior_vcirc = -0.5 * \
+            ((np.abs(vcirc) - vTFR_mean)/sigma_int)**2
 
         return logPrior_vcirc
     
