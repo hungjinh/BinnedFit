@@ -23,14 +23,32 @@ class RotationCurveFit(GaussFit_spec2D):
         self.active_par_key = active_par_key
         self.fix_par_key    = [item for item in self.Parameter.all_par_key if item not in self.active_par_key]
         self.Ntot_active_par = len(self.active_par_key)
-
-        self.gaussfit_peakLambda, self.gaussfit_amp, self.gaussfit_sigma = self.gaussFit_spec2D(data=self.data)
+        
+        self.remove_0signal_grid()
+        
 
         if e_obs is not None:
             self.shear_mode = 1
             self.e_obs = e_obs
         else:
             self.shear_mode = 0
+
+    def remove_0signal_grid(self, threshold_amp=1e-20):
+        '''
+            check positions where the peak amp is small, and remove these position info.
+        '''
+
+        self.gaussfit_peakLambda, self.gaussfit_amp, self.gaussfit_sigma = self.gaussFit_spec2D(data=self.data)
+        
+        ID_small_amp = np.where(np.abs(self.gaussfit_amp) < threshold_amp)[0]
+
+        if len(ID_small_amp) != 0 :
+            ID_keep = np.where(np.abs(self.gaussfit_amp) >= threshold_amp)[0]
+
+            self.gaussfit_amp = self.gaussfit_amp[ID_keep]
+            self.gaussfit_peakLambda = self.gaussfit_peakLambda[ID_keep]
+            self.gaussfit_sigma = self.gaussfit_sigma[ID_keep]
+            self.grid_pos = self.grid_pos[ID_keep]
 
 
     def model_arctan_rotation(self, r, vscale, r_0, vcirc, v_0, redshift, sini):
@@ -170,7 +188,8 @@ class RotationCurveFit(GaussFit_spec2D):
         chain_info = {}
         chain_info['acceptance_fraction'] = np.mean(sampler.acceptance_fraction) # good range: 0.2~0.5
         chain_info['lnprobability'] = sampler.lnprobability
-        chain_info['chain'] = np.dstack( (np.dstack((sampler.chain, chain_e_int)), chain_gamma))
+        chain_info['chain'] = np.dstack( (np.dstack((sampler.chain[:,], chain_e_int)), chain_gamma))
+        #chain_info['chain'] = np.column_stack( (sampler.chain, chain_e_int, chain_gamma))
         chain_info['par_key'] = self.active_par_key + ['e_int', 'g1']
         chain_info['par_fid'] = self.Parameter.par_fid
         chain_info['par_name'] = self.Parameter.par_name

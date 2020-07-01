@@ -87,9 +87,10 @@ def gen_dataInfo_from_tfCube(sini=1.0,
                             g1=0.0, 
                             slitAngles=np.array([0.]), slitWidth=0.02,
                             knot_fraction=0.0,
-                            n_knots=10.):
+                            n_knots=10.,
+                            norm=1e-26):
                             
-    pars = tfCube.getParams(sini=sini, vcirc=vcirc, redshift=redshift, slitAngles=slitAngles, slitWidth=slitWidth, knot_fraction=knot_fraction, n_knots=n_knots)
+    pars = tfCube.getParams(sini=sini, vcirc=vcirc, redshift=redshift, slitAngles=slitAngles, slitWidth=slitWidth, knot_fraction=knot_fraction, n_knots=n_knots, norm=norm)
 
     pars['type_of_observation'] = 'slit'
     # to make things practical during testing, increase the spaxel size.
@@ -102,7 +103,7 @@ def gen_dataInfo_from_tfCube(sini=1.0,
     pars['aspect'] = 0.2
     pars['area'] = 3.14 * (1000./2.)**2
     pars['linelist']['flux'][pars['linelist']['species'] == 'Halpha'] = 6e-24
-    pars['norm'] = 1e-26
+    pars['norm'] = norm
     pars['lambda_min'] = (1 + pars['redshift']) * pars['linelist']['lambda'][pars['linelist']['species'] == 'Halpha'] - 2
     pars['lambda_max'] = (1 + pars['redshift']) * pars['linelist']['lambda'][pars['linelist']['species'] == 'Halpha'] + 2
 
@@ -122,8 +123,6 @@ def gen_dataInfo_from_tfCube(sini=1.0,
 
     extent =  pars['image_size'] * pars['pixScale']
     subGridPixScale = extent*1./pars['ngrid']
-    # turned off continuum
-    pars['add_continuum'] = False
 
     # ========================
     print_key_list=['redshift', 'g1', 'half_light_radius', 'vcirc', 'sini', 'slitWidth', 'slitAngles']
