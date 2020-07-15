@@ -84,7 +84,8 @@ def arctan_rotation_curve(r, vscale, r_0, vcirc, v_0, sini):
 def gen_dataInfo_from_tfCube(sini=1.0, 
                             vcirc=200., 
                             redshift=0.6,
-                            g1=0.0, 
+                            g1=0.0,
+                            g2=0.0,
                             slitAngles=np.array([0.]), slitWidth=0.02,
                             knot_fraction=0.0,
                             n_knots=10.,
@@ -95,7 +96,7 @@ def gen_dataInfo_from_tfCube(sini=1.0,
     pars['type_of_observation'] = 'slit'
     # to make things practical during testing, increase the spaxel size.
     pars['g1'] = g1
-    pars['g2'] = 0.0
+    pars['g2'] = g2
     pars['nm_per_pixel'] = 0.025
     pars['expTime'] = 10000.
     pars['pixScale'] = 0.032
@@ -200,6 +201,7 @@ class Parameter():
     def gen_par_fiducial(self, par_tfCube):
         par_fid = {}
         par_fid['sini'] = par_tfCube['sini']
+        par_fid['cosi'] = np.sqrt(1-par_fid['sini']**2)
         par_fid['redshift'] = par_tfCube['redshift']
         par_fid['r_0'] = 0.0
         par_fid['vscale'] = par_tfCube['vscale']
@@ -215,12 +217,13 @@ class Parameter():
 
     def def_par_lim(self):
         par_lim = {}
-        par_lim['sini'] = [-1., 1.]
+        par_lim['sini'] = [0., 1.]
+        par_lim['cosi'] = [0., 1.]
         par_lim['redshift'] = [self.par_fid['redshift']-0.0035, self.par_fid['redshift']+0.0035]
         par_lim['r_0'] = [-2., 2.]
         par_lim['vscale'] = [0., 10.]
         par_lim['v_0'] = [-1000., 1000.]
-        par_lim['vcirc'] = [0., 1000.]
+        par_lim['vcirc'] = [-1000., 1000.]
 
         par_lim['e_obs'] = [0., 1.]
         par_lim['half_light_radius'] = [0.01, 10.]
@@ -234,6 +237,7 @@ class Parameter():
         '''
         par_std = {}
         par_std['sini'] = 0.1
+        par_std['cosi'] = 0.1
         par_std['redshift'] = 0.001
         par_std['r_0'] = 0.1
         par_std['vscale'] = 0.1
@@ -244,6 +248,7 @@ class Parameter():
     def def_par_name(self):
         par_name = {}
         par_name['sini'] = "${\mathrm{sin}}(i)$"
+        par_name['cosi'] = "${\mathrm{cos}}(i)$"
         par_name['redshift'] = "$z_{\mathrm c}$"
         par_name['r_0'] = "$r_0$"
         par_name['vscale'] = "$r_{\mathrm{vscale}}$"

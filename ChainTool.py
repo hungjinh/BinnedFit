@@ -36,17 +36,25 @@ class ChainTool():
         self.par_fid = chain_info['par_fid']
         self.par_name = chain_info['par_name']
 
-        if ('sini' in self.chain_par_key and 'vcirc' in self.chain_par_key):
+        if 'cosi' in self.chain_par_key:
+            self.append_sini()
+
+        if (('sini' or 'cosi') in self.chain_par_key and 'vcirc' in self.chain_par_key):
             self.append_vsini()
-            self.chain_par_key = self.chain_par_key + ['vsini']
         
         self.chain_par_id = {item:j for j, item in enumerate(self.chain_par_key)}
 
+    def append_sini(self):
+        cosi = self.chain[:, self.chain_par_key.index('cosi')]
+        sini = np.sqrt(1-cosi**2)
+        self.chain = np.append(self.chain, sini[..., None], 1)
+        self.chain_par_key = self.chain_par_key + ['sini']
     
     def append_vsini(self):
         vsini = self.chain[:, self.chain_par_key.index('sini')] * \
             self.chain[:, self.chain_par_key.index('vcirc')]
         self.chain = np.append(self.chain, vsini[..., None], 1)
+        self.chain_par_key = self.chain_par_key + ['vsini']
 
 
     def select_par_info(self, select_par_key):

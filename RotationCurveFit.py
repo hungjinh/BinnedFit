@@ -10,7 +10,7 @@ from GaussFit_spec2D import GaussFit_spec2D
 
 class RotationCurveFit(GaussFit_spec2D):
 
-    def __init__(self, data_info, e_obs=None, active_par_key=['vscale', 'r_0', 'vcirc', 'v_0'], par_fix=None):
+    def __init__(self, data_info, e_obs=None, active_par_key=['vscale', 'r_0', 'vcirc', 'v_0'], par_fix=None, sigma_TF_intr=0.05):
         '''
             e.g. 
             active_par_key = ['vscale', 'r_0', 'vcirc', 'v_0']
@@ -19,6 +19,7 @@ class RotationCurveFit(GaussFit_spec2D):
 
         super().__init__(data_info)
         self.Parameter = Parameter(par_tfCube = data_info['par_fid'], par_fix=par_fix)
+        self.sigma_TF_intr = sigma_TF_intr
 
         self.active_par_key = active_par_key
         self.fix_par_key    = [item for item in self.Parameter.all_par_key if item not in self.active_par_key]
@@ -43,12 +44,12 @@ class RotationCurveFit(GaussFit_spec2D):
         ID_small_amp = np.where(np.abs(self.gaussfit_amp) < threshold_amp)[0]
 
         if len(ID_small_amp) != 0 :
-            ID_keep = np.where(np.abs(self.gaussfit_amp) >= threshold_amp)[0]
+            self.ID_keep = np.where(np.abs(self.gaussfit_amp) >= threshold_amp)[0]
 
-            self.gaussfit_amp = self.gaussfit_amp[ID_keep]
-            self.gaussfit_peakLambda = self.gaussfit_peakLambda[ID_keep]
-            self.gaussfit_sigma = self.gaussfit_sigma[ID_keep]
-            self.grid_pos = self.grid_pos[ID_keep]
+            self.gaussfit_amp = self.gaussfit_amp[self.ID_keep]
+            self.gaussfit_peakLambda = self.gaussfit_peakLambda[self.ID_keep]
+            self.gaussfit_sigma = self.gaussfit_sigma[self.ID_keep]
+            self.grid_pos = self.grid_pos[self.ID_keep]
 
 
     def model_arctan_rotation(self, r, vscale, r_0, vcirc, v_0, redshift, sini):
@@ -97,6 +98,9 @@ class RotationCurveFit(GaussFit_spec2D):
 
         par = self.Parameter.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key)
         #print(par)
+        
+        if 'cosi' in self.active_par_key:
+            par['sini'] = np.sqrt(1-par['cosi']**2)
 
         model = self.model_arctan_rotation(self.grid_pos, vscale=par['vscale'], r_0=par['r_0'], vcirc=par['vcirc'], v_0=par['v_0'], redshift=par['redshift'], sini=par['sini'])
         #print(model_1D_lambdaPeak)
@@ -107,7 +111,7 @@ class RotationCurveFit(GaussFit_spec2D):
         diff = self.gaussfit_peakLambda - model
         chi2 = np.sum((diff/self.gaussfit_sigma)**2)
 
-        return chi2
+        return chi2, par['sini']
 
     def cal_loglike(self, active_par):
         
@@ -123,7 +127,7 @@ class RotationCurveFit(GaussFit_spec2D):
         #    loglike[x]=-np.inf
         ######### vectorized #########
 
-        chi2 = self.cal_chi2(active_par)
+        chi2, sini = self.cal_chi2(active_par)
 
         ### informative prior ###
         if 'vcirc' in self.active_par_key:
@@ -134,24 +138,23 @@ class RotationCurveFit(GaussFit_spec2D):
 
         loglike = -0.5*chi2 + logPrior_vcirc
 
-        e_int = self.cal_e_int(sini=par['sini'], aspect=self.Parameter.par_fid['aspect'])
+        e_int = self.cal_e_int(sini=sini, aspect=self.Parameter.par_fid['aspect'])
         g1 = self.cal_gamma1(e_int=e_int, e_obs=self.e_obs)
 
         return loglike, e_int, g1
+
     
     def logPrior_vcirc(self, vcirc):
         '''
             add logPrior on intrinsic circular velocity of disk based on TF relation
         '''
-        #sigma_int = 0.1
         #M_B = -21.8
-        #log10_vTFR_mean = np.log10(np.abs(self.Parameter.par_fid['vcirc'])) # 2.142-0.128*(M_B + 20.558)
-        #logPrior_vcirc = -0.5 * ((np.log10(np.abs(vcirc)) - log10_vTFR_mean)/sigma_int)**2
-
-        sigma_int = 20.
-        vTFR_mean = np.abs(self.Parameter.par_fid['vcirc'])
+        log10_vTFR_mean = np.log10(np.abs(self.Parameter.par_fid['vcirc'])) # 2.142-0.128*(M_B + 20.558)
         logPrior_vcirc = -0.5 * \
-            ((np.abs(vcirc) - vTFR_mean)/sigma_int)**2
+            ((np.log10(np.abs(vcirc)) - log10_vTFR_mean)/self.sigma_TF_intr)**2
+
+        #vTFR_mean = np.abs(self.Parameter.par_fid['vcirc'])
+        #logPrior_vcirc = -0.5 * ((np.abs(vcirc) - vTFR_mean)/self.sigma_TF_intr)**2
 
         return logPrior_vcirc
     
@@ -166,6 +169,7 @@ class RotationCurveFit(GaussFit_spec2D):
         Ndim = self.Ntot_active_par
         starting_point = [ self.Parameter.par_fid[item] for item in self.active_par_key ]
         std = [ self.Parameter.par_std[item] for item in self.active_par_key ]
+
         blobs_dtype = [("e_int", float), ("g1", float)]
         p0_walkers = emcee.utils.sample_ball(starting_point, std, size=Nwalker)
 
@@ -188,11 +192,11 @@ class RotationCurveFit(GaussFit_spec2D):
         chain_info = {}
         chain_info['acceptance_fraction'] = np.mean(sampler.acceptance_fraction) # good range: 0.2~0.5
         chain_info['lnprobability'] = sampler.lnprobability
-        chain_info['chain'] = np.dstack( (np.dstack((sampler.chain[:,], chain_e_int)), chain_gamma))
-        #chain_info['chain'] = np.column_stack( (sampler.chain, chain_e_int, chain_gamma))
-        chain_info['par_key'] = self.active_par_key + ['e_int', 'g1']
         chain_info['par_fid'] = self.Parameter.par_fid
         chain_info['par_name'] = self.Parameter.par_name
+
+        chain_info['chain'] = np.dstack( (np.dstack((sampler.chain[:,], chain_e_int)), chain_gamma))
+        chain_info['par_key'] = self.active_par_key + ['e_int', 'g1']
 
         return chain_info
 
