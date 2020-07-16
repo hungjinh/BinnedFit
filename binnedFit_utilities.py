@@ -81,6 +81,25 @@ def arctan_rotation_curve(r, vscale, r_0, vcirc, v_0, sini):
     v = v_0 + 2/np.pi*vcirc * sini * np.arctan((r - r_0)/vscale)
     return v
 
+def cal_e_int(sini, q_z=0.2):
+    '''
+        Huff+13 eq. 16
+    '''
+    return (1-q_z**2)*(sini)**2/(2-(1-q_z**2)*sini**2)
+
+def cal_e_obs(e_int, gamma1):
+    '''
+        Huff+13 eq. 13
+    '''
+    return e_int + 2*(1-e_int**2)*gamma1
+
+def cal_theta_obs(e_int, gamma2):
+    '''
+        Huff+13 eq. 14
+    '''
+    return gamma2/e_int
+
+
 def gen_dataInfo_from_tfCube(sini=1.0, 
                             vcirc=200., 
                             redshift=0.6,
