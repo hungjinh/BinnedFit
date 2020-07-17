@@ -75,11 +75,21 @@ def get_peak_info(data, grid_spec):
 def gaussian(x, x0, amp, sigma):
     return amp*np.exp( -(x-x0)**2 / (2*sigma**2) ) / np.sqrt(2*np.pi*sigma**2)
 
-def arctan_rotation_curve(r, vscale, r_0, vcirc, v_0, sini):
-    #r2=r.reshape(256,1)###SSS
-    #v = v_0 + 2/np.pi*vcirc * sini * np.arctan((r2 - r_0)/vscale)
-    v = v_0 + 2/np.pi*vcirc * sini * np.arctan((r - r_0)/vscale)
+def arctan_rotation_curve(r, vscale, r_0, v_spec, v_0):
+    '''
+        v_spec = vcirc* sini 
+    '''
+    # r2 = r.reshape(256,1)###SSS
+    # v = v_0 + 2/np.pi*vcirc * sini * np.arctan((r2 - r_0)/vscale)
+
+    v = v_0 + 2/np.pi * v_spec * np.arctan((r - r_0)/vscale)
     return v
+
+def cal_sini(v_spec, v_TF):
+    '''
+        Huff+13 eq. 1
+    '''
+    return v_spec/v_TF
 
 def cal_e_int(sini, q_z=0.2):
     '''
@@ -87,17 +97,29 @@ def cal_e_int(sini, q_z=0.2):
     '''
     return (1-q_z**2)*(sini)**2/(2-(1-q_z**2)*sini**2)
 
-def cal_e_obs(e_int, gamma1):
+def cal_e_obs(e_int, gamma_p):
     '''
         Huff+13 eq. 13
     '''
-    return e_int + 2*(1-e_int**2)*gamma1
+    return e_int + 2*(1-e_int**2)*gamma_p
 
-def cal_theta_obs(e_int, gamma2):
+def cal_theta_obs(e_int, gamma_x):
     '''
         Huff+13 eq. 14
     '''
-    return gamma2/e_int
+    return gamma_x/e_int
+
+def cal_gamma_p(e_int, e_obs):
+    '''
+        Huff+13 eq. 17
+    '''
+    return (e_obs-e_int)/2/(1-e_int**2)
+
+def cal_gamma_x(v_spec_minor, v_TF, e_int, q_z=0.2):
+    '''
+        Huff+13 eq. 20
+    '''
+    return - v_spec_minor/v_TF * np.sqrt( (1-q_z**2)*e_int / (2*(1+e_int)) )
 
 
 def gen_dataInfo_from_tfCube(sini=1.0, 
@@ -210,7 +232,7 @@ class Parameter():
         self.par_fix = par_fix
         self.par_set = self.par_set(par_fix=self.par_fix)
 
-        self.all_par_key = ['vscale', 'r_0', 'vcirc', 'v_0', 'redshift', 'sini']
+        self.all_par_key = ['vscale', 'r_0', 'v_spec', 'v_0', 'redshift']
         self.par_absID = {item:j for j, item in enumerate(self.all_par_key)}
 
         self.par_std = self.def_par_std()
@@ -232,22 +254,22 @@ class Parameter():
         par_fid['g1'] = par_tfCube['g1']
         par_fid['g2'] = par_tfCube['g2']
         par_fid['vsini'] = par_fid['vcirc']*par_fid['sini']
+        par_fid['v_spec'] = par_fid['vcirc']*par_fid['sini']
         return par_fid
 
     def def_par_lim(self):
         par_lim = {}
         par_lim['sini'] = [0., 1.]
-        par_lim['cosi'] = [0., 1.]
         par_lim['redshift'] = [self.par_fid['redshift']-0.0035, self.par_fid['redshift']+0.0035]
         par_lim['r_0'] = [-2., 2.]
         par_lim['vscale'] = [0., 10.]
         par_lim['v_0'] = [-1000., 1000.]
-        par_lim['vcirc'] = [-1000., 1000.]
+        par_lim['v_spec'] = [-1000., 1000.]
 
         par_lim['e_obs'] = [0., 1.]
         par_lim['half_light_radius'] = [0.01, 10.]
         par_lim['e_int'] = [0., 1.]
-
+    
         return par_lim
     
     def def_par_std(self):
@@ -255,13 +277,11 @@ class Parameter():
             define the initial std of emcee walkers around starting point 
         '''
         par_std = {}
-        par_std['sini'] = 0.1
-        par_std['cosi'] = 0.1
         par_std['redshift'] = 0.001
         par_std['r_0'] = 0.1
         par_std['vscale'] = 0.1
         par_std['v_0'] = 20.
-        par_std['vcirc'] = 20.
+        par_std['v_spec'] = 20.
         return par_std
     
     def def_par_name(self):
@@ -277,6 +297,7 @@ class Parameter():
         par_name['g1'] = "$\gamma_{\mathrm{1}}$"
         par_name['g2'] = "$\gamma_{\mathrm{2}}$"
         par_name['vsini'] = "$v_{\mathrm{circ}}{\mathrm{sin}}(i)$"
+        par_name['v_spec'] = "$v_{\mathrm{spec}}$"
         return par_name
 
     def par_set(self, par_fix=None):
