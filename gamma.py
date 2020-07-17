@@ -15,17 +15,8 @@ class Gamma():
             v_spec_minor : chain of v_spec measured from 2D spec info (1d np.array)
         '''
 
-        self.kde_e_obs = self.construct_kde(chain=e_obs)
-        self.kde_v_spec_major = self.construct_kde(chain=v_spec_major)
-
         self.active_par_key = ['e_obs', 'v_spec_major', 'v_TF']
 
-        if v_spec_minor is not None:
-            self.kde_v_spec_minor = self.construct_kde(chain=v_spec_minor)
-            self.mode_gamma_x = True
-            self.active_par_key += ['v_spec_minor']
-        else:
-            self.mode_gamma_x = False
         
         self.sigma_TF_intr = sigma_TF_intr
         
@@ -33,6 +24,18 @@ class Gamma():
         self.par_lim = self.def_par_lim()
         self.par_start, self.par_std = self.def_par_MCMC()
         self.par_name = self.def_par_name()
+
+        self.flogL_e_obs = self.construct_flogL(chain=e_obs, bounds=self.par_lim['e_obs'], Nbins=10000.)
+        self.flogL_v_spec_major = self.construct_flogL(chain=v_spec_major, bounds=self.par_lim['v_spec_major'], Nbins=10000.)
+
+        if v_spec_minor is not None:
+            self.flogL_v_spec_minor = self.construct_flogL(chain=v_spec_minor, bounds=self.par_lim['v_spec_minor'], Nbins=10000.)
+
+            self.mode_gamma_x = True
+            self.active_par_key += ['v_spec_minor']
+        else:
+            self.mode_gamma_x = False
+
 
     def def_par_lim(self):
 
@@ -77,9 +80,27 @@ class Gamma():
         par_name['gamma_x'] = "$\gamma_{\mathrm{x}}$"
         return par_name
     
-    def construct_kde(self, chain):
+    def construct_flogL(self, chain, bounds, Nbins):
+        '''
+            build an interp1d function for logPdf from the method of kde.logpdf  (which is ~500x slower if using it...)
+            chain : the 1D MCMC chain that you would like to derive the logpdf based on its distribution
+            bounds : the boundary that this interp1d is working
+            Nbins : tuning the resoultion about the interp1d
+        '''        
+       # print("start building interpolator witn Nbins", Nbins)
+        #Tstart = time.time()
+
         kde = gaussian_kde(chain.T, bw_method=None)
-        return kde
+        #x_tick = np.linspace(bounds[0], bounds[1], Nbins)
+        #logpdf = kde.logpdf(x=x_tick)
+
+        #flogL = interp1d(x_tick, logpdf, bounds_error=False, fill_value=-np.inf)
+
+        #Tend = (time.time()-Tstart)/60.
+        #print ("Total building time (mins):", Tend)
+
+        #return flogL
+        return kde.logpdf
 
     def logPrior_v_TF(self, v_TF):
         '''
@@ -105,17 +126,17 @@ class Gamma():
             #    return -np.inf
 
         logPrior_v_TF = self.logPrior_v_TF(v_TF=par['v_TF'])
-        logPrior_v_major = self.kde_v_spec_major.logpdf(x=par['v_spec_major'])
-        logPrior_e_obs = self.kde_e_obs.logpdf(x=par['e_obs'])
+        logPrior_v_major = self.flogL_v_spec_major(x=par['v_spec_major'])
+        logPrior_e_obs = self.flogL_e_obs(x=par['e_obs'])
         
         loglike = logPrior_v_TF+logPrior_v_major+logPrior_e_obs
 
         sini = cal_sini(v_spec=par['v_spec_major'], v_TF=par['v_TF'])
         e_int = cal_e_int(sini=sini, q_z=0.2)
-        gamma_p = cal_gamma_p(e_int=e_int, e_obs=par['e_obs'])
+        gamma_p = cal_gamma_p(e_int=e_int, e_obs=par['e_obs'])  #
 
         if self.mode_gamma_x is True:
-            logPrior_v_minor = self.kde_v_spec_minor.logpdf(x=par['v_spec_minor'])
+            logPrior_v_minor = self.flogL_v_spec_major(x=par['v_spec_minor'])
             loglike += logPrior_v_minor
             gamma_x = cal_gamma_x(v_spec_minor=par['v_spec_minor'], v_TF=par['v_TF'], e_int=e_int, q_z=0.2)
 
