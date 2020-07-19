@@ -14,7 +14,7 @@ from RotationCurveFit import RotationCurveFit
 
 class Gamma():
 
-    def __init__(self, data_info, sigma_TF_intr=0.08, gamma_x_mode=True):
+    def __init__(self, data_info, sigma_TF_intr=0.08, mode_gamma_x=True):
         '''
 
         '''
@@ -25,10 +25,10 @@ class Gamma():
         self.active_par_key = self.ImgFit.active_par_key + ['v_TF', 'vscale', 'r_0', 'v_0', 'v_spec_major']
         self.derived_par_key = ['sini', 'e_int', 'gamma_p']
 
-        self.gamma_x_mode = gamma_x_mode
+        self.mode_gamma_x = mode_gamma_x
         self.sigma_TF_intr = sigma_TF_intr
 
-        if self.gamma_x_mode==True:
+        if self.mode_gamma_x==True:
             if "data_minor" in data_info.keys():
                 self.RotFit_minor = RotationCurveFit(data_info, active_par_key=['vscale', 'r_0', 'v_0', 'v_spec'], data_key="data_minor")
                 
@@ -80,7 +80,7 @@ class Gamma():
 
         loglike = logL_Image+logL_Rot_major+logPrior_v_TF
 
-        if self.gamma_x_mode == True:
+        if self.mode_gamma_x == True:
             v_spec_minor = active_par[-1]
             active_par_Rot_minor = np.array(list(active_par[3:6])+[v_spec_minor])
             #print(v_spec_minor)
@@ -105,7 +105,7 @@ class Gamma():
 
         blobs_dtype = [("sini", float), ("e_int", float), ("gamma_p", float)]
 
-        if self.gamma_x_mode is True:
+        if self.mode_gamma_x is True:
             blobs_dtype += [("gamma_x", float)]
         
         p0_walkers = emcee.utils.sample_ball(starting_point, std, size=Nwalker)
@@ -125,7 +125,7 @@ class Gamma():
         chain_e_int = np.array(sampler.get_blobs()['e_int']).T
         chain_gamma_p = np.array(sampler.get_blobs()['gamma_p']).T
 
-        if self.gamma_x_mode is True:
+        if self.mode_gamma_x is True:
             chain_gamma_x = np.array(sampler.get_blobs()['gamma_x']).T
 
         chain_info = {}
@@ -135,7 +135,7 @@ class Gamma():
         chain_info['par_fid'] = self.par_fid
         chain_info['par_name'] = self.RotFit_major.Parameter.par_name
 
-        if self.gamma_x_mode is True:
+        if self.mode_gamma_x is True:
             chain_gamma_x = np.array(sampler.get_blobs()['gamma_x']).T
             chain_info['chain'] = np.dstack((np.dstack((np.dstack((np.dstack(
                 (sampler.chain[:, ], chain_sini)), chain_e_int)), chain_gamma_p)), chain_gamma_x))
