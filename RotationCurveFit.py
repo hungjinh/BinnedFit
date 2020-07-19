@@ -10,12 +10,17 @@ from GaussFit_spec2D import GaussFit_spec2D
 
 class RotationCurveFit(GaussFit_spec2D):
 
-    def __init__(self, data_info, active_par_key=['vscale', 'r_0', 'v_spec', 'v_0'], par_fix=None):
+    def __init__(self, data_info, active_par_key=['vscale', 'r_0', 'v_spec', 'v_0'], par_fix=None, data_key=None):
         '''
+            data_key : specify which 2D spec data to use to put in data_info['data']
+                       "data_major" or "data_minor"
             e.g. 
             active_par_key = ['vscale', 'r_0', 'v_spec', 'v_0'] # 'redshift'
             par_fix = {'redshift': 0.598}
         '''
+
+        if data_key is not None:
+            data_info['data'] = data_info[data_key]
 
         super().__init__(data_info)
         self.Parameter = Parameter(par_tfCube = data_info['par_fid'], par_fix=par_fix)

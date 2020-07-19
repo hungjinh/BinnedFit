@@ -249,12 +249,19 @@ class Parameter():
         par_fid['v_0'] = 0.0
         par_fid['vcirc'] = par_tfCube['vcirc']
         par_fid['aspect'] = par_tfCube['aspect']
-        par_fid['e_int'] = ((1-par_tfCube['aspect']**2)*par_tfCube['sini']
-                            ** 2) / (2-(1-par_tfCube['aspect']**2)*par_tfCube['sini']**2)
+        par_fid['e_int'] = cal_e_int(sini=par_fid['sini'], q_z=par_fid['aspect'])
         par_fid['g1'] = par_tfCube['g1']
         par_fid['g2'] = par_tfCube['g2']
+        par_fid['gamma_p'] = par_tfCube['g1']
+        par_fid['gamma_x'] = par_tfCube['g2']
         par_fid['vsini'] = par_fid['vcirc']*par_fid['sini']
         par_fid['v_spec'] = par_fid['vcirc']*par_fid['sini']
+        par_fid['v_spec_major'] = par_fid['vcirc']*par_fid['sini']
+        par_fid['v_spec_minor'] = 0.
+        par_fid['e_obs'] = cal_e_obs(e_int=par_fid['e_int'], gamma_p=par_tfCube['g1'])
+        par_fid['half_light_radius'] = par_tfCube['half_light_radius']
+        par_fid['v_TF'] = par_tfCube['vcirc']
+
         return par_fid
 
     def def_par_lim(self):
@@ -277,23 +284,39 @@ class Parameter():
             define the initial std of emcee walkers around starting point 
         '''
         par_std = {}
-        par_std['redshift'] = 0.001
-        par_std['r_0'] = 0.1
+        par_std['e_obs'] = 0.1
+        par_std['half_light_radius'] = 0.1
+        par_std['v_TF'] = 10.
         par_std['vscale'] = 0.1
-        par_std['v_0'] = 20.
+        par_std['r_0'] = 0.1
+        par_std['v_0'] = 10.
+        par_std['v_spec_major'] = 10.
+        par_std['v_spec_minor'] = 5.
+        
         par_std['v_spec'] = 20.
+        par_std['redshift'] = 0.001
+
         return par_std
     
     def def_par_name(self):
         par_name = {}
+        par_name['e_obs'] = "$e_{\mathrm{obs}}$"
+        par_name['half_light_radius'] = "$r_{\\mathrm 1/2}$"
+        par_name['v_TF'] = "$v_{\mathrm{TF}}$"
+        par_name['vscale'] = "$r_{\mathrm{vscale}}$"
+        par_name['r_0'] = "$r_0$"
+        par_name['v_0'] = "$v_0$"
+        par_name['v_spec_major'] = "$v_{\mathrm{spec, major}}$"
+        par_name['v_spec_minor'] = "$v_{\mathrm{spec, minor}}$"
+
         par_name['sini'] = "${\mathrm{sin}}(i)$"
+        par_name['e_int'] = "$e_{\mathrm{int}}$"
+        par_name['gamma_p'] = "$\gamma_{\mathrm{+}}$"
+        par_name['gamma_x'] = "$\gamma_{\mathrm{x}}$"
+
         par_name['cosi'] = "${\mathrm{cos}}(i)$"
         par_name['redshift'] = "$z_{\mathrm c}$"
-        par_name['r_0'] = "$r_0$"
-        par_name['vscale'] = "$r_{\mathrm{vscale}}$"
-        par_name['v_0'] = "$v_0$"
         par_name['vcirc'] = "$v_{\mathrm{circ}}$"
-        par_name['e_int'] = "$e_{\mathrm{int}}$"
         par_name['g1'] = "$\gamma_{\mathrm{1}}$"
         par_name['g2'] = "$\gamma_{\mathrm{2}}$"
         par_name['vsini'] = "$v_{\mathrm{circ}}{\mathrm{sin}}(i)$"
