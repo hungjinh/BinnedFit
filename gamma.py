@@ -87,20 +87,20 @@ class Gamma():
             bounds : the boundary that this interp1d is working
             Nbins : tuning the resoultion about the interp1d
         '''        
-       # print("start building interpolator witn Nbins", Nbins)
-        #Tstart = time.time()
+        print("start building interpolator witn Nbins", Nbins)
+        Tstart = time.time()
 
         kde = gaussian_kde(chain.T, bw_method=None)
-        #x_tick = np.linspace(bounds[0], bounds[1], Nbins)
-        #logpdf = kde.logpdf(x=x_tick)
+        x_tick = np.linspace(bounds[0], bounds[1], Nbins)
+        logpdf = kde.logpdf(x=x_tick)
 
-        #flogL = interp1d(x_tick, logpdf, bounds_error=False, fill_value=-np.inf)
+        flogL = interp1d(x_tick, logpdf, bounds_error=False, fill_value=-np.inf)
 
-        #Tend = (time.time()-Tstart)/60.
-        #print ("Total building time (mins):", Tend)
+        Tend = (time.time()-Tstart)/60.
+        print ("Total building time (mins):", Tend)
 
-        #return flogL
-        return kde.logpdf
+        return flogL
+        #return kde.logpdf
 
     def logPrior_v_TF(self, v_TF):
         '''
