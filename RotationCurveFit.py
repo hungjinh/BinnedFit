@@ -41,13 +41,14 @@ class RotationCurveFit(GaussFit_spec2D):
         
         ID_small_amp = np.where(np.abs(self.gaussfit_amp) < threshold_amp)[0]
 
+        self.grid_pos_ori = self.grid_pos.copy()
         if len(ID_small_amp) != 0 :
             self.ID_keep = np.where(np.abs(self.gaussfit_amp) >= threshold_amp)[0]
 
             self.gaussfit_amp = self.gaussfit_amp[self.ID_keep]
             self.gaussfit_peakLambda = self.gaussfit_peakLambda[self.ID_keep]
             self.gaussfit_sigma = self.gaussfit_sigma[self.ID_keep]
-            self.grid_pos = self.grid_pos[self.ID_keep]
+            self.grid_pos = self.grid_pos_ori[self.ID_keep]
 
 
     def model_arctan_rotation(self, r, vscale, r_0, v_spec, v_0, redshift):
