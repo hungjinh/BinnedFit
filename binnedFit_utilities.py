@@ -7,6 +7,7 @@ sys.path.append("/Users/hhg/Research/kinematic_lensing/code/BinnedFit/")
 import time
 sys.path.append("/Users/hhg/Research/kinematic_lensing/repo/KLens/")
 import tfCube as tfCube
+import matplotlib.pyplot as plt
 
 c = 299792.458  # km/s
 
@@ -351,3 +352,94 @@ class Parameter():
             par[item] = par_partial[item] 
         
         return par
+
+
+class Galaxy():
+
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+        self.q = b/a
+        self.e = self.cal_e(q=self.q)
+        self.tip_pts = self.tip_pts_on_ellipse0()
+        self.sini = self.cal_sini_exp(qz=0.2)
+
+    def cal_e(self, q):
+        return (1-q**2)/(1+q**2)
+
+    def cal_sini_exp(self, qz=0.2):
+        '''
+            compute expected sini given the observed major and minor axes
+            assuming a round disk, with aspect ratio of qz (=0.2 as default)
+        '''
+        sini = np.sqrt((1-self.q**2)/(1-qz**2))
+        print('expected sini:', sini)
+        return sini
+
+    def eq_ellipse0(self, X, Y):
+        ellipse0 = (X/self.a)**2 + (Y/self.b)**2 - 1
+        return ellipse0
+
+    def eq_ellipse_sheared_v1(self, X, Y, gamma_p, gamma_x):
+        '''
+            my derivation of the sheared ellipse eq.
+            (this eq. works for any values of ellipse axes a, b)
+        '''
+        ellipse_sheared = (1-2*gamma_p)*(X/self.a)**2 + (1+2*gamma_p) * \
+            (Y/self.b)**2 - 2*gamma_x*(1./self.a**2+1./self.b**2)*X*Y - 1
+        return ellipse_sheared
+
+    def eq_ellipse_sheared_H13(self, X, Y, gamma_p, gamma_x):
+        '''
+            eq. 7 of Huff+13
+            (this eq. ignores the linear order of gamma in the constant term)
+        '''
+
+        if not np.isclose(self.b, 1.0):
+            raise Exception(f"Using this eq. requires setting minor axis b=1.0 . (now b={self.b})")
+
+        ellipse_sheard = self.q**2 * \
+            (1-4*gamma_p)*X**2 + Y**2 - 2*(1+self.q**2)*gamma_x*X*Y - 1.
+        return ellipse_sheard
+
+    def eq_ellipse_sheared_H13p(self, X, Y, gamma_p, gamma_x):
+        '''
+            modified eq. 7 of Huff+13
+            (strictly keep all linear order terms of gamma)
+        '''
+
+        if not np.isclose(self.b, 1.0):
+            raise Exception(f"Using this eq. requires setting minor axis b=1.0 . (now b={self.b})")
+
+        ellipse_sheard = self.q**2 * \
+            (1-4*gamma_p)*X**2 + Y**2 - 2 * \
+            (1+self.q**2)*gamma_x*X*Y - 1./(1+2*gamma_p)
+        return ellipse_sheard
+
+    def pts_on_ellipse(self, X, Y, sparsity=1, eq_ellipse=None, A=None):
+        '''
+            sampling points on the contour of ellipse
+        '''
+
+        fig0, ax0 = plt.subplots(1, 1, figsize=(3, 3))
+
+        if eq_ellipse is None:
+            CS = ax0.contour(X, Y, self.eq_ellipse0(X, Y), [0], colors='b')
+        else:
+            CS = ax0.contour(X, Y, eq_ellipse(X, Y), [0], colors='b')
+        pts = CS.allsegs[0][0]
+
+        plt.close(fig0)
+
+        if A is None:
+            return pts[::sparsity, :]
+        else:
+            pts_sheard = (A @ pts.T).T
+            return pts_sheard[::sparsity, :]
+
+    def tip_pts_on_ellipse0(self):
+        pt_left = [self.a, 0.]
+        pt_right = [-self.a, 0.]
+        pt_top = [0., self.b]
+        pt_bottom = [0., -self.b]
+        return np.array([pt_left, pt_right, pt_top, pt_bottom])

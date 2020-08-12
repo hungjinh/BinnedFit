@@ -62,19 +62,26 @@ class Gamma():
         v_TF = active_par[2]
         v_spec_major = active_par[6]
         e_obs = active_par[0]
-        #print(active_par_ImgFit)
-        #print(active_par_Rot_major)
-        #print(v_TF)
-        #print(v_spec_major)
-        #print(e_obs)
-
-        logL_Image = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
-        logL_Rot_major = self.RotFit_major.cal_loglike(active_par=active_par_Rot_major)
 
         logPrior_v_TF = self.logPrior_v_TF(v_TF=v_TF)
 
         # derived parameter
         sini = cal_sini(v_spec=v_spec_major, v_TF=v_TF)
+
+        if np.abs(sini) > 1:
+            #print(f"sini out of [-1, 1]! sini={sini}=({v_spec_major}/{v_TF})")
+            if self.mode_gamma_x == True:
+                return -np.inf, sini, 99., 99., 99.
+            else:
+                return -np.inf, sini, 99., 99.
+
+
+        logL_Image = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
+        #logL_Image = 0.
+        #e_obs = 0.23450413223140495
+
+        logL_Rot_major = self.RotFit_major.cal_loglike(active_par=active_par_Rot_major)
+
         e_int = cal_e_int(sini=sini, q_z=0.2)
         gamma_p = cal_gamma_p(e_int=e_int, e_obs=e_obs)
 
@@ -83,8 +90,6 @@ class Gamma():
         if self.mode_gamma_x == True:
             v_spec_minor = active_par[-1]
             active_par_Rot_minor = np.array(list(active_par[3:6])+[v_spec_minor])
-            #print(v_spec_minor)
-            #print(active_par_Rot_minor)
 
             logL_Rot_minor = self.RotFit_minor.cal_loglike(active_par=active_par_Rot_minor)
 
