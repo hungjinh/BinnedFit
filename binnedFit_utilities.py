@@ -208,20 +208,6 @@ def gen_dataInfo_from_tfCube(sini=1.0,
 
     return data_info
 
-def getSlitSpectra(data=None, pars=None):
-    spectra = []
-    extent = pars['image_size'] * pars['pixScale']
-    subGridPixScale = extent*1./pars['ngrid']
-    grid = np.arange(-extent/2., extent/2., subGridPixScale)
-    xx, yy = np.meshgrid(grid, grid)
-    slit_weight = np.ones((pars['ngrid'], pars['ngrid']))
-    slit_weight[np.abs(yy-pars['slitOffset']) > pars['slitWidth']/2.] = 0.
-
-    for this_slit_angle in pars['slitAngles']:
-        this_data = rotate(data, -this_slit_angle*(180./np.pi), reshape=False)
-        spectra.append(np.sum(this_data*slit_weight[:, :, np.newaxis], axis=0))
-    return spectra
-
 class Parameter():
     def __init__(self, par_tfCube=None, par_fix=None):
 
