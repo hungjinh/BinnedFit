@@ -1,6 +1,13 @@
 import numpy as np
 from chainconsumer import ChainConsumer
 
+import sys
+import pathlib
+dir_repo = str(pathlib.Path(__file__).parent.absolute())+'/..'
+dir_KLens = dir_repo + '/KLens'
+sys.path.append(dir_KLens)
+from tfCube2 import Parameters
+
 blue        = "#214F94"
 red         = "#CC0204"
 yellow      = "#FFA903"
@@ -16,7 +23,7 @@ teal        = "#51ABAE"
 lightgray   = "#CDCDCD"
 
 
-class ChainTool():
+class ChainTool(Parameters):
     def __init__(self, chain_info, Nburn, Nend=None):
         
         self.raw_chain = chain_info['chain']
@@ -34,7 +41,7 @@ class ChainTool():
 
         self.chain_par_key = chain_info['par_key']
         self.par_fid = chain_info['par_fid']
-        self.par_name = chain_info['par_name']
+        self.par_name = self.set_par_name()
         
         self.chain_par_id = {item:j for j, item in enumerate(self.chain_par_key)}
 

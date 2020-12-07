@@ -4,56 +4,47 @@ import time
 import emcee
 from multiprocessing import Pool
 
-from binnedFit_utilities import *
-from GaussFit_spec2D import GaussFit_spec2D
 import galsim
+from binnedFit_utilities import *
+
+import sys
+import pathlib
+dir_repo = str(pathlib.Path(__file__).parent.absolute())+'/..'
+dir_KLens = dir_repo + '/KLens'
+sys.path.append(dir_KLens)
+from tfCube2 import Parameters, GalaxyImage
 
 
+class ImageFit(GalaxyImage):
+    def __init__(self, data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2'], par_fix=None):
 
-class ImageFit():
-    def __init__(self, data_info, par_fix=None):
+        self.par_fid = data_info['par_fid']
+        self.par_fix = par_fix
+
+        if self.par_fix is not None:
+            self.par_base = self.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
+        else:
+            self.par_base = self.par_fid.copy()
+        
+        super().__init__(pars=self.par_base, flux_norm=data_info['flux_norm'])
+
         self.image = data_info['image']
         self.variance = data_info['image_variance']
-        self.grid_pos = data_info['grid_Image']
         
-        self.parameters = data_info['par_fid']
-
-        self.active_par_key = ['e_obs', 'half_light_radius']
+        self.active_par_key = active_par_key
         self.Ntot_active_par = len(self.active_par_key)
-        self.par_lim = self.def_par_lim()
-        self.par_name = {'e_obs': "$e_{\\mathrm obs}$",
-                         'half_light_radius': "$r_{\\mathrm 1/2}$"}
-        self.par_fid = {'e_obs': 0.3,
-                        'half_light_radius': 0.5}
-    
-    def def_par_lim(self):
-        par_lim = {}
-        par_lim['e_obs'] = [0., 1.]
-        par_lim['half_light_radius'] = [0.0, 2.]
-        return par_lim
-
-    def model_image(self, e_obs, half_light_radius):
-
-        psf = galsim.Gaussian(fwhm=self.parameters['psfFWHM'])
-
-        g1_int = e_obs/2
-
-        disk = galsim.Sersic(n=1, half_light_radius=half_light_radius, flux=1)
-        disk = disk.shear(g1=g1_int, g2=0.0)
-
-        galObj = galsim.Convolution([disk, psf])
-        image = galsim.Image(
-            self.parameters['image_size'], self.parameters['image_size'], scale=self.parameters['pixScale'])
-        newImage = galObj.drawImage(image=image)
-
-        return newImage.array
+        
+        self.par_lim = self.set_par_lim()
+        self.par_std = self.set_par_std()
 
     def cal_chi2(self, active_par):
         '''
-            active_par : e_obs, half_light_radius 
+            active_par : half_light_radius, theta_int, ...
         '''
-        model = self.model_image(
-            e_obs=active_par[0], half_light_radius=active_par[1])
+        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+
+        e = cal_e_int(sini=par['sini'], q_z=par['aspect'])
+        model = self.model(e=e, half_light_radius=par['half_light_radius'], theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'])
         
         diff = self.image - model
         chi2 = np.sum(diff**2 / self.variance)
@@ -62,8 +53,10 @@ class ImageFit():
 
     def cal_loglike(self, active_par):
 
+        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+
         for ind, item in enumerate(self.active_par_key):
-            if (active_par[ind] < self.par_lim[item][0] or active_par[ind] > self.par_lim[item][1]):
+            if (par[item] < self.par_lim[item][0] or par[item] > self.par_lim[item][1]):
                 return -np.inf
         
         chi2 = self.cal_chi2(active_par)
@@ -74,8 +67,8 @@ class ImageFit():
     def run_MCMC(self, Nwalker, Nsteps):
 
         Ndim = self.Ntot_active_par
-        starting_point = [0.5, 0.5] # e_obs, half_light_radius
-        std = [0.01, 0.01]
+        starting_point = [self.par_fid[item] for item in self.active_par_key]
+        std = [self.par_std[item] for item in self.active_par_key]
         p0_walkers = emcee.utils.sample_ball(starting_point, std, size=Nwalker)
 
         sampler = emcee.EnsembleSampler(Nwalker, Ndim, self.cal_loglike, a=5.0)
@@ -95,7 +88,7 @@ class ImageFit():
         chain_info['chain'] = sampler.chain
         chain_info['par_key'] = self.active_par_key
         chain_info['par_fid'] = self.par_fid
-        chain_info['par_name'] = self.par_name
+        chain_info['par_fix'] = self.par_fix
 
         return chain_info
 

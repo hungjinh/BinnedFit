@@ -2,104 +2,64 @@ import numpy as np
 import time
 import emcee
 from multiprocessing import Pool
-from binnedFit_utilities import *
 from scipy.stats import gaussian_kde
 from scipy.interpolate import interp1d
-
 import sys
-sys.path.append("/Users/hhg/Research/kinematic_lensing/code/BinnedFit/")
-from GaussFit_spec2D import GaussFit_spec2D
+import pathlib
+
+from binnedFit_utilities import *
 from ImageFit import ImageFit
 from RotationCurveFit import RotationCurveFit
 
-class Gamma():
+dir_repo = str(pathlib.Path(__file__).parent.absolute())+'/..'
+dir_KLens = dir_repo + '/KLens'
+sys.path.append(dir_KLens)
+from tfCube2 import Parameters
 
-    def __init__(self, data_info, sigma_TF_intr=0.08, mode_gamma_x=True):
-        '''
+class Gamma(Parameters):
 
-        '''
+    def __init__(self, data_info, active_par_key=['vcirc', 'sini', 'vscale', 'r_0', 'v_0', 'g1', 'g2',  'half_light_radius', 'theta_int'], par_fix=None):
 
-        self.ImgFit = ImageFit(data_info) # active_par_key = ['e_obs', 'half_light_radius']
-        self.RotFit_major = RotationCurveFit(data_info, active_par_key=['vscale', 'r_0', 'v_0', 'v_spec'], data_key="data_major")
+        self.sigma_TF_intr = 0.08
 
-        self.active_par_key = self.ImgFit.active_par_key + ['v_TF', 'vscale', 'r_0', 'v_0', 'v_spec_major']
-        self.derived_par_key = ['sini', 'e_int', 'gamma_p']
+        super().__init__(par_in=data_info['par_fid'], line_species=data_info['line_species'])
 
-        self.mode_gamma_x = mode_gamma_x
-        self.sigma_TF_intr = sigma_TF_intr
+        self.par_fid = data_info['par_fid']
+        self.par_fix = par_fix
 
-        if self.mode_gamma_x==True:
-            if "data_minor" in data_info.keys():
-                self.RotFit_minor = RotationCurveFit(data_info, active_par_key=['vscale', 'r_0', 'v_0', 'v_spec'], data_key="data_minor")
-                
-            self.active_par_key += ['v_spec_minor']
-            self.derived_par_key += ['gamma_x']
+        if self.par_fix is not None:
+            self.par_base = self.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
+        else:
+            self.par_base = self.par_fid.copy()
         
-        self.par_fid = self.RotFit_major.Parameter.par_fid.copy()
-        self.par_std = self.RotFit_major.Parameter.par_std.copy()
+        self.ImgFit = ImageFit(data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2']) 
+        self.RotFit= RotationCurveFit(data_info, active_par_key=active_par_key)
 
-    def logPrior_v_TF(self, v_TF):
-        '''
-            add logPrior on the intrinsic circular velocity of disk based on TF relation
-            # this function need to be modified in the future
-        '''
-        #M_B = -21.8
-        # np.log10(np.abs(self.Parameter.par_fid['vcirc']))
-        log10_vTFR_mean = np.log10(200.)
-        logPrior_v_TF = -0.5 * \
-            ((np.log10(np.abs(v_TF)) - log10_vTFR_mean)/self.sigma_TF_intr)**2
+        self.active_par_key_img = self.ImgFit.active_par_key
+        self.active_par_key = active_par_key
 
-        return logPrior_v_TF
-    
+        self.par_lim = self.set_par_lim()  # defined in tfCube2.Parameters.set_par_lim()
+        self.par_std = self.set_par_std()
+
     def cal_loglike(self, active_par):
         '''
-            active_par need to be an array following the order of active_par_key, which is:
-            ['e_obs', 'half_light_radius'] + ['v_TF', 'vscale', 'r_0', 'v_0', 'v_spec_major'] + (['v_spec_minor'])
         '''
 
-        active_par_ImgFit = active_par[0:2]
-        active_par_Rot_major = active_par[3:7]
-        v_TF = active_par[2]
-        v_spec_major = active_par[6]
-        e_obs = active_par[0]
+        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
-        logPrior_v_TF = self.logPrior_v_TF(v_TF=v_TF)
-
-        # derived parameter
-        sini = cal_sini(v_spec=v_spec_major, v_TF=v_TF)
-
-        if np.abs(sini) > 1:
-            #print(f"sini out of [-1, 1]! sini={sini}=({v_spec_major}/{v_TF})")
-            if self.mode_gamma_x == True:
-                return -np.inf, sini, 99., 99., 99.
-            else:
-                return -np.inf, sini, 99., 99.
-
-
-        logL_Image = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
-        #logL_Image = 0.
-        #e_obs = 0.23450413223140495
-
-        logL_Rot_major = self.RotFit_major.cal_loglike(active_par=active_par_Rot_major)
-
-        e_int = cal_e_int(sini=sini, q_z=0.2)
-        gamma_p = cal_gamma_p(e_int=e_int, e_obs=e_obs)
-
-        loglike = logL_Image+logL_Rot_major+logPrior_v_TF
-
-        if self.mode_gamma_x == True:
-            v_spec_minor = active_par[-1]
-            active_par_Rot_minor = np.array(list(active_par[3:6])+[v_spec_minor])
-
-            logL_Rot_minor = self.RotFit_minor.cal_loglike(active_par=active_par_Rot_minor)
-
-            gamma_x = cal_gamma_x(v_spec_minor=v_spec_minor, v_TF=v_TF, e_int=e_int, q_z=0.2)
-
-            loglike += logL_Rot_minor
-
-            return loglike, sini, e_int, gamma_p, gamma_x
+        for item in self.active_par_key:
+            if (par[item] < self.par_lim[item][0] or par[item] > self.par_lim[item][1]):
+                return -np.inf
         
-        return loglike, sini, e_int, gamma_p
+        logPrior_vcirc = self.RotFit.logPrior_vcirc(vcirc=par['vcirc'], sigma_TF_intr=self.sigma_TF_intr)
+
+        active_par_ImgFit = [par[item_key] for item_key in self.active_par_key_img]
+        logL_img = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
+        logL_spec = self.RotFit.cal_loglike(active_par=active_par)
+
+        loglike = logL_img+logL_spec+logPrior_vcirc
+
+        return loglike
     
     def run_MCMC(self, Nwalker, Nsteps):
 
@@ -108,14 +68,10 @@ class Gamma():
         starting_point = [self.par_fid[item] for item in self.active_par_key]
         std = [self.par_std[item] for item in self.active_par_key]
 
-        blobs_dtype = [("sini", float), ("e_int", float), ("gamma_p", float)]
-
-        if self.mode_gamma_x is True:
-            blobs_dtype += [("gamma_x", float)]
         
         p0_walkers = emcee.utils.sample_ball(starting_point, std, size=Nwalker)
 
-        sampler = emcee.EnsembleSampler(Nwalker, Ndim, self.cal_loglike, a=2.0, blobs_dtype=blobs_dtype)
+        sampler = emcee.EnsembleSampler(Nwalker, Ndim, self.cal_loglike, a=2.0)
 
         posInfo = sampler.run_mcmc(p0_walkers, 5)
         p0_walkers = posInfo.coords
@@ -126,31 +82,14 @@ class Gamma():
         Time_MCMC = (time.time()-Tstart)/60.
         print ("Total MCMC time (mins):", Time_MCMC)
 
-        chain_sini = np.array(sampler.get_blobs()['sini']).T
-        chain_e_int = np.array(sampler.get_blobs()['e_int']).T
-        chain_gamma_p = np.array(sampler.get_blobs()['gamma_p']).T
-
-        if self.mode_gamma_x is True:
-            chain_gamma_x = np.array(sampler.get_blobs()['gamma_x']).T
 
         chain_info = {}
-        chain_info['acceptance_fraction'] = np.mean(
-            sampler.acceptance_fraction)  # good range: 0.2~0.5
+        chain_info['acceptance_fraction'] = np.mean(sampler.acceptance_fraction)  # good range: 0.2~0.5
         chain_info['lnprobability'] = sampler.lnprobability
         chain_info['par_fid'] = self.par_fid
-        chain_info['par_name'] = self.RotFit_major.Parameter.par_name
-
-        if self.mode_gamma_x is True:
-            chain_gamma_x = np.array(sampler.get_blobs()['gamma_x']).T
-            chain_info['chain'] = np.dstack((np.dstack((np.dstack((np.dstack(
-                (sampler.chain[:, ], chain_sini)), chain_e_int)), chain_gamma_p)), chain_gamma_x))
-            chain_info['par_key'] = self.active_par_key + self.derived_par_key
-
-        else:
-            chain_info['chain'] = np.dstack((np.dstack(
-                (np.dstack((sampler.chain[:, ], chain_sini)), chain_e_int)), chain_gamma_p))
-            #np.column_stack((sampler.chain[:,], chain_sini, chain_e_int, chain_gamma_p))
-            chain_info['par_key'] = self.active_par_key + self.derived_par_key
+        chain_info['chain'] = sampler.chain
+        chain_info['par_key'] = self.active_par_key
+        chain_info['par_fix'] = self.par_fix
 
         return chain_info
 
