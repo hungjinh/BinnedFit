@@ -4,7 +4,7 @@ from scipy.ndimage.interpolation import rotate
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-
+import sys
 
 c = 299792.458  # km/s
 
