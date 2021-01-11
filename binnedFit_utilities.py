@@ -81,11 +81,15 @@ def cal_e_obs(e_int, g1):
     '''
     return e_int + 2*(1-e_int**2)*g1
 
-def cal_theta_obs(e_int, g2):
+def cal_theta_obs(g1, g2, theta_int=0.):
     '''
-        Huff+13 eq. 14
+        previous expression:
+            Huff+13 eq. 14 : theta_int + g2/e_int 
+        updated expression:
     '''
-    return g2/e_int
+    tan_thetaINT = np.tan(theta_int)
+    theta_sheared = np.arctan2( g2+(1.-g1)*tan_thetaINT, (1.+g1)+g2*tan_thetaINT )
+    return theta_sheared
 
 def cal_g1(e_int, e_obs):
     '''
