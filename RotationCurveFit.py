@@ -131,17 +131,17 @@ class RotationCurveFit(Parameters):
             GaussFit = GaussFit_signle(spec2D=self.spec[j], lambda_emit=self.lambda_emit, lambdaGrid=self.lambdaGrid, spaceGrid=self.spaceGrid)
             stats = {}
             peakLambda, amp, sigma = GaussFit.gaussFit_spec2D(spec2D=self.spec[j])
-            stats['peakLambda'], stats['amp'], stats['sigma'], stats['spaceGrid'] = self._remove_0signal_grid(peakLambda, amp, sigma, threshold_amp=1e-20)
+            stats['peakLambda'], stats['amp'], stats['sigma'], stats['spaceGrid'] = self._remove_0signal_grid(peakLambda, amp, sigma, threshold_SN=1e-10)
             spec_stats.append(stats)
         
         return spec_stats
             
-    def _remove_0signal_grid(self, peakLambda, amp, sigma, threshold_amp=1e-20):
+    def _remove_0signal_grid(self, peakLambda, amp, sigma, threshold_SN=1e-10):
         '''
             check positions where the peak amp is small, and remove these position info.
         '''
-        
-        ID_keep = np.where(np.abs(amp) >= threshold_amp)[0]
+        SN = amp/sigma
+        ID_keep = np.where(np.abs(SN) >= threshold_SN)[0]
 
         if len(ID_keep) < len(amp):
 
@@ -201,6 +201,7 @@ class RotationCurveFit(Parameters):
         for j in range(self.Nspec):
             
             model = self.model_arctan_rotation(r=self.spec_stats[j]['spaceGrid'], vcirc=par['vcirc'], sini=par['sini'], vscale=par['vscale'], r_0=par['r_0'], v_0=par['v_0'], g1=par['g1'], g2=par['g2'], theta_int=par['theta_int'], redshift=par['redshift'], slitAngle=par['slitAngles'][j])
+            #print(model)
 
             diff = self.spec_stats[j]['peakLambda'] - model
             chi2 = np.sum((diff/self.spec_stats[j]['sigma'])**2)

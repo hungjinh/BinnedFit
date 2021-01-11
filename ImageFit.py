@@ -36,6 +36,13 @@ class ImageFit(GalaxyImage):
         
         self.par_lim = self.set_par_lim()
         self.par_std = self.set_par_std()
+    
+    def model_image(self, sini, half_light_radius, theta_int, g1, g2):
+
+        e = cal_e_int(sini=sini, q_z=self.par_fid['aspect'])
+        model = self.model(e=e, half_light_radius=half_light_radius, theta_int=theta_int, g1=g1, g2=g2)
+
+        return model
 
     def cal_chi2(self, active_par):
         '''
@@ -43,8 +50,7 @@ class ImageFit(GalaxyImage):
         '''
         par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
-        e = cal_e_int(sini=par['sini'], q_z=par['aspect'])
-        model = self.model(e=e, half_light_radius=par['half_light_radius'], theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'])
+        model = self.model_image(sini=par['sini'], half_light_radius=par['half_light_radius'],theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'])
         
         diff = self.image - model
         chi2 = np.sum(diff**2 / self.variance)

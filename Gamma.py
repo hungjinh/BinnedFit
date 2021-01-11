@@ -32,8 +32,8 @@ class Gamma(Parameters):
         else:
             self.par_base = self.par_fid.copy()
         
-        self.ImgFit = ImageFit(data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2']) 
-        self.RotFit= RotationCurveFit(data_info, active_par_key=active_par_key)
+        self.ImgFit = ImageFit(data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2'], par_fix=par_fix) 
+        self.RotFit= RotationCurveFit(data_info, active_par_key=active_par_key, par_fix=par_fix)
 
         self.active_par_key_img = self.ImgFit.active_par_key
         self.active_par_key = active_par_key
@@ -56,6 +56,8 @@ class Gamma(Parameters):
         active_par_ImgFit = [par[item_key] for item_key in self.active_par_key_img]
         logL_img = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
         logL_spec = self.RotFit.cal_loglike(active_par=active_par)
+        #print('logL_img:', logL_img)
+        #print('logL_spec:', logL_spec)
 
         loglike = logL_img+logL_spec+logPrior_vcirc
 

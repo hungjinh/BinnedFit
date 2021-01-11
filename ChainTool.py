@@ -86,15 +86,42 @@ class ChainTool(Parameters):
             if mode == 2:
                 return select_par_bestfit, select_par_lower_err, select_par_upper_err
     
-    def par_maxlike(self, select_par_key=None):
-
+    def par_maxlike(self, chain=None, lnprob=None, select_par_key=None):
+        
+        if chain is None:
+            chain = self.chain
+        if lnprob is None:
+            lnprob = self.lnprob
         if select_par_key is None:
             select_par_key=self.chain_par_key
 
-        ind_maxlike = np.argmax(self.lnprob) # max likelihood index
-        maxlike_value = self.lnprob[ind_maxlike]
-        par_maxlike = self.chain[ind_maxlike]
+        ind_maxlike = np.argmax(lnprob) # max likelihood index
+        maxlike_value = lnprob[ind_maxlike]
+        par_maxlike = chain[ind_maxlike]
 
-        select_par_id, select_par_name, select_par_fid = self.select_par_info(select_par_key)
-
+        select_par_id = [self.chain_par_id[item] for item in select_par_key]
+        
         return par_maxlike[select_par_id], maxlike_value
+    
+    def extract_subchain(self, par_bound):
+        '''
+            extract a subspace of the chain given parameter boundary
+            e.g. par_bound={'sini':[0.,0.1], 'g1':[0.05, 0.1]}
+        '''
+
+        subchain = self.chain.copy()
+        sublnprob = self.lnprob.copy()
+
+        for item in par_bound.keys():
+
+            par_id = self.chain_par_id[item]
+            take_out_id = np.where((subchain[:,par_id] > par_bound[item][0]) & (subchain[:,par_id] < par_bound[item][1]))
+
+            subchain = subchain[take_out_id[0], :]
+            sublnprob = sublnprob[take_out_id[0]]
+        
+        return subchain, sublnprob
+
+
+
+
