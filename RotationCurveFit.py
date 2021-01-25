@@ -88,7 +88,7 @@ class GaussFit_signle():
         return model_spec2D
 
 
-class RotationCurveFit(Parameters):
+class RotationCurveFit():
 
     def __init__(self, data_info, active_par_key=['vcirc', 'sini', 'vscale', 'r_0', 'v_0', 'g1', 'g2', 'theta_int'], par_fix=None):
         '''
@@ -99,13 +99,13 @@ class RotationCurveFit(Parameters):
 
         self.sigma_TF_intr = 0.08
 
-        super().__init__(par_in=data_info['par_fid'], line_species=data_info['line_species'])
+        self.Pars = Parameters(par_in=data_info['par_fid'], line_species=data_info['line_species'])
 
         self.par_fid = data_info['par_fid']
         self.par_fix = par_fix
 
         if self.par_fix is not None:
-            self.par_base = self.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
+            self.par_base = self.Pars.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
         else:
             self.par_base = self.par_fid.copy()
 
@@ -120,8 +120,8 @@ class RotationCurveFit(Parameters):
         
         self.spec_stats = self.spec_statstics()
 
-        self.par_lim = self.set_par_lim() # defined in tfCube2.Parameters.set_par_lim()
-        self.par_std = self.set_par_std()
+        self.par_lim = self.Pars.set_par_lim() # defined in tfCube2.Parameters.set_par_lim()
+        self.par_std = self.Pars.set_par_std()
 
 
     def spec_statstics(self):
@@ -195,7 +195,7 @@ class RotationCurveFit(Parameters):
     
     def cal_chi2(self, active_par):
 
-        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+        par = self.Pars.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
         
         chi2_tot = 0.
         for j in range(self.Nspec):
@@ -211,13 +211,13 @@ class RotationCurveFit(Parameters):
 
     def cal_loglike(self, active_par):
         
-        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+        par = self.Pars.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
         for item in self.active_par_key:
             if ( par[item] < self.par_lim[item][0] or par[item] > self.par_lim[item][1] ):
                 return -np.inf
         
-        logPrior_vcirc = self.logPrior_vcirc(vcirc=par['vcirc'], sigma_TF_intr=self.sigma_TF_intr)
+        logPrior_vcirc = self.Pars.logPrior_vcirc(vcirc=par['vcirc'], sigma_TF_intr=self.sigma_TF_intr)
 
         chi2 = self.cal_chi2(active_par)
 

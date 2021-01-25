@@ -15,18 +15,20 @@ sys.path.append(dir_KLens)
 from tfCube2 import Parameters, GalaxyImage
 
 
-class ImageFit(GalaxyImage):
+class ImageFit():
     def __init__(self, data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2'], par_fix=None):
+
+        self.Pars = Parameters(par_in=data_info['par_fid'])
 
         self.par_fid = data_info['par_fid']
         self.par_fix = par_fix
 
         if self.par_fix is not None:
-            self.par_base = self.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
+            self.par_base = self.Pars.gen_par_dict(active_par=list(self.par_fix.values()), active_par_key=list(self.par_fix.keys()), par_ref=self.par_fid)
         else:
             self.par_base = self.par_fid.copy()
         
-        super().__init__(pars=self.par_base, flux_norm=data_info['flux_norm'])
+        self.GalImg = GalaxyImage(pars=self.par_base, flux_norm=data_info['flux_norm'])
 
         self.image = data_info['image']
         self.variance = data_info['image_variance']
@@ -34,13 +36,13 @@ class ImageFit(GalaxyImage):
         self.active_par_key = active_par_key
         self.Ntot_active_par = len(self.active_par_key)
         
-        self.par_lim = self.set_par_lim()
-        self.par_std = self.set_par_std()
+        self.par_lim = self.Pars.set_par_lim()
+        self.par_std = self.Pars.set_par_std()
     
     def model_image(self, sini, half_light_radius, theta_int, g1, g2):
 
         e = cal_e_int(sini=sini, q_z=self.par_fid['aspect'])
-        model = self.model(e=e, half_light_radius=half_light_radius, theta_int=theta_int, g1=g1, g2=g2)
+        model = self.GalImg.model(e=e, half_light_radius=half_light_radius, theta_int=theta_int, g1=g1, g2=g2)
 
         return model
 
@@ -48,7 +50,7 @@ class ImageFit(GalaxyImage):
         '''
             active_par : half_light_radius, theta_int, ...
         '''
-        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+        par = self.Pars.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
         model = self.model_image(sini=par['sini'], half_light_radius=par['half_light_radius'],theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'])
         
@@ -59,7 +61,7 @@ class ImageFit(GalaxyImage):
 
     def cal_loglike(self, active_par):
 
-        par = self.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
+        par = self.Pars.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
         for ind, item in enumerate(self.active_par_key):
             if (par[item] < self.par_lim[item][0] or par[item] > self.par_lim[item][1]):
