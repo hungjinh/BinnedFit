@@ -44,7 +44,16 @@ class ChainTool(Parameters):
         self.par_name = self.set_par_name()
         
         self.chain_par_id = {item:j for j, item in enumerate(self.chain_par_key)}
-
+    
+    def add_vsini(self):
+        if all(key in self.chain_par_key for key in ['vcirc', 'sini']):
+            self.column_vsini = self.chain[:, self.chain_par_id['vcirc']]*self.chain[:, self.chain_par_id['sini']]
+            self.chain = np.append(self.chain, self.column_vsini[..., None], 1)
+            self.chain_par_key = self.chain_par_key + ['vsini']
+            self.par_fid['vsini'] = self.par_fid['vcirc']*self.par_fid['sini']
+            self.chain_par_id['vsini'] = -1
+        else:
+            print('To append vsini, need both vcirc and sini exist in chain_par_key.')
 
     def select_par_info(self, select_par_key):
 
