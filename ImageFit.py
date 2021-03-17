@@ -16,7 +16,7 @@ from tfCube2 import Parameters, GalaxyImage
 
 
 class ImageFit():
-    def __init__(self, data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2'], par_fix=None):
+    def __init__(self, data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2', 'flux'], par_fix=None):
 
         self.Pars = Parameters(par_in=data_info['par_fid'])
 
@@ -39,10 +39,10 @@ class ImageFit():
         self.par_lim = self.Pars.set_par_lim()
         self.par_std = self.Pars.set_par_std()
     
-    def model_image(self, sini, half_light_radius, theta_int, g1, g2):
+    def model_image(self, sini, half_light_radius, theta_int, g1, g2, flux=None):
 
         e = cal_e_int(sini=sini, q_z=self.par_fid['aspect'])
-        model = self.GalImg.model(e=e, half_light_radius=half_light_radius, theta_int=theta_int, g1=g1, g2=g2)
+        model = self.GalImg.model(e=e, half_light_radius=half_light_radius, theta_int=theta_int, g1=g1, g2=g2, flux=flux)
 
         return model
 
@@ -52,7 +52,7 @@ class ImageFit():
         '''
         par = self.Pars.gen_par_dict(active_par=active_par, active_par_key=self.active_par_key, par_ref=self.par_base)
 
-        model = self.model_image(sini=par['sini'], half_light_radius=par['half_light_radius'],theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'])
+        model = self.model_image(sini=par['sini'], half_light_radius=par['half_light_radius'],theta_int=par['theta_int'], g1=par['g1'], g2=par['g2'], flux=par['flux'])
         
         diff = self.image - model
         chi2 = np.sum(diff**2 / self.variance)

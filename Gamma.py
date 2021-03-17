@@ -18,7 +18,7 @@ from tfCube2 import Parameters
 
 class Gamma():
 
-    def __init__(self, data_info, active_par_key=['vcirc', 'sini', 'vscale', 'r_0', 'v_0', 'g1', 'g2',  'half_light_radius', 'theta_int'], par_fix=None):
+    def __init__(self, data_info, active_par_key=['vcirc', 'sini', 'vscale', 'r_0', 'v_0', 'g1', 'g2',  'half_light_radius', 'theta_int', 'flux'], par_fix=None):
 
         self.sigma_TF_intr = 0.08
 
@@ -32,7 +32,11 @@ class Gamma():
         else:
             self.par_base = self.par_fid.copy()
         
-        self.ImgFit = ImageFit(data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2'], par_fix=par_fix) 
+        self.ImgFit = ImageFit(data_info, active_par_key=['sini', 'half_light_radius', 'theta_int', 'g1', 'g2', 'flux'], par_fix=par_fix)
+
+        #if 'flux' in active_par_key:
+        #    active_par_key.remove('flux')
+        
         self.RotFit = RotationCurveFit(data_info, active_par_key=active_par_key, par_fix=par_fix)
 
         self.active_par_key_img = self.ImgFit.active_par_key
@@ -51,7 +55,7 @@ class Gamma():
             if (par[item] < self.par_lim[item][0] or par[item] > self.par_lim[item][1]):
                 return -np.inf
         
-        logPrior_vcirc = self.Pars.logPrior_vcirc(vcirc=par['vcirc'], sigma_TF_intr=self.sigma_TF_intr)
+        logPrior_vcirc = self.Pars.logPrior_vcirc(vcirc=par['vcirc'], sigma_TF_intr=self.sigma_TF_intr, vTFR_mean=75.)
 
         active_par_ImgFit = [par[item_key] for item_key in self.active_par_key_img]
         logL_img = self.ImgFit.cal_loglike(active_par=active_par_ImgFit)
